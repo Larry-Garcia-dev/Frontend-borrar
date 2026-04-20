@@ -2,6 +2,7 @@
 // Configure this URL to match your backend deployment
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_PREFIX = "/api/v1";
 
 // Types
 export interface User {
@@ -110,7 +111,7 @@ class APIClient {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
       ...options,
       headers,
     });
@@ -144,7 +145,7 @@ class APIClient {
 
   async loginWithGoogle(): Promise<void> {
     // Redirige directamente al endpoint de Google OAuth del backend
-    window.location.href = `${API_BASE_URL}/auth/google`;
+    window.location.href = `${API_BASE_URL}${API_PREFIX}/auth/google`;
   }
 
   async handleGoogleCallback(code: string): Promise<AuthResponse> {
