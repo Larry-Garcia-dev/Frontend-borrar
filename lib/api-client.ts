@@ -143,7 +143,8 @@ class APIClient {
   }
 
   async loginWithGoogle(): Promise<void> {
-    window.location.href = `${API_BASE_URL}/auth/google/login`;
+    // Redirige directamente al endpoint de Google OAuth del backend
+    window.location.href = `${API_BASE_URL}/auth/google`;
   }
 
   async handleGoogleCallback(code: string): Promise<AuthResponse> {
