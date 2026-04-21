@@ -62,7 +62,11 @@ class ImageReport(Base):
     rejection_disclaimer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Who reviewed the report
-    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
