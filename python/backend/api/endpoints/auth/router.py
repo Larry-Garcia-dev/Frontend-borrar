@@ -192,9 +192,12 @@ async def google_callback(
     try:
         user_info = await exchange_google_code(code)
     except Exception as e:
+        # Log the error for debugging
+        import logging
+        logging.error(f"Google OAuth error: {str(e)}. Check that GOOGLE_REDIRECT_URI matches exactly what's configured in Google Cloud Console.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error al verificar con Google: {str(e)}"
+            detail=f"Error al verificar con Google: {str(e)}. Verifique que GOOGLE_REDIRECT_URI coincida con la configuracion de Google Cloud Console."
         )
 
     google_sub = user_info.get("sub")
@@ -210,20 +213,20 @@ async def google_callback(
     
     # Domain restriction for new users
     email_domain = email.split("@")[-1].lower() if "@" in email else ""
-    is_macondo_domain = email_domain == "macondosoftware.com"
+    is_macondo_domain = email_domain == "macondosoftwares.com"
     
     if not user:
-        # New user - only allow @macondosoftware.com domains
+        # New user - only allow @macondosoftwares.com domains
         if not is_macondo_domain:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="El inicio de sesion con Google solo esta disponible para cuentas @macondosoftware.com. "
+                detail="El inicio de sesion con Google solo esta disponible para cuentas @macondosoftwares.com. "
                        "Por favor, registrese con email y contrasena.",
             )
         
         # Create admin user for Macondo domain
         role = UserRole.ADMIN
-        if email.strip().lower() == "superadmin@macondosoftware.com":
+        if email.strip().lower() == "superadmin@macondosoftwares.com":
             role = UserRole.SUPER_ADMIN
         
         user = User(
