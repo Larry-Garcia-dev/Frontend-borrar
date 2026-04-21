@@ -15,14 +15,22 @@ import {
   ChevronDown,
   LayoutDashboard,
   Store,
+  CreditCard,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/dashboard", label: "Generar", icon: Sparkles },
   { href: "/gallery", label: "Galeria", icon: Image },
+  { href: "/billing", label: "Balance", icon: CreditCard },
+];
+
+const studioLinks = [
+  { href: "/studio", label: "Mis Modelos", icon: UserPlus },
 ];
 
 const adminLinks = [
@@ -44,6 +52,7 @@ export function Navbar() {
 
   const isAdmin = user?.isAdmin;
   const isVendor = user?.isVendor;
+  const isStudio = user?.role === "STUDIO" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   // Calculate remaining credits
   const remainingCredits = user
@@ -89,6 +98,27 @@ export function Navbar() {
                     </Link>
                   );
                 })}
+
+                {/* Studio links */}
+                {isStudio &&
+                  studioLinks.map((link) => {
+                    const Icon = link.icon;
+                    const isActive = pathname === link.href;
+                    return (
+                      <Link key={link.href} href={link.href}>
+                        <Button
+                          variant={isActive ? "secondary" : "ghost"}
+                          className={cn(
+                            "gap-2 text-base",
+                            isActive && "bg-primary/10 text-primary"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                          {link.label}
+                        </Button>
+                      </Link>
+                    );
+                  })}
 
                 {/* Admin dropdown */}
                 {isAdmin && (
@@ -179,6 +209,9 @@ export function Navbar() {
           <div className="hidden items-center gap-4 md:flex">
             {isAuthenticated ? (
               <>
+                {/* Notifications */}
+                <NotificationsDropdown />
+
                 {/* Quota indicator */}
                 {user && (
                   <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2">
