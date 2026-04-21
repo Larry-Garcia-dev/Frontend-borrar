@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -9,13 +11,17 @@ import {
   Settings,
   ChevronLeft,
   Shield,
+  AlertTriangle,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/lib/store/auth-store";
 
 const sidebarLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Usuarios", icon: Users },
-  { href: "/admin/settings", label: "Configuracion", icon: Settings },
+  { href: "/admin/reports", label: "Reportes", icon: AlertTriangle },
+  { href: "/admin/costs", label: "Costos", icon: DollarSign },
 ];
 
 export default function AdminLayout({
@@ -24,6 +30,24 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, isInitialized } = useAuthStore();
+
+  // Verificar que el usuario sea admin
+  useEffect(() => {
+    if (isInitialized && (!isAuthenticated || !user?.isAdmin)) {
+      router.push("/dashboard");
+    }
+  }, [isInitialized, isAuthenticated, user, router]);
+
+  // Mostrar loading mientras se verifica
+  if (!isInitialized || !isAuthenticated || !user?.isAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

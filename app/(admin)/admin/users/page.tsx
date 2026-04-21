@@ -16,150 +16,84 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, User } from "@/lib/api-client";
+import { Card, CardContent } from "@/components/ui/card";
+import { useAdminStore } from "@/lib/store/admin-store";
 import { formatDate, cn } from "@/lib/utils";
 
-const roleColors = {
-  admin: "bg-purple-500/10 text-purple-500 border-purple-500/30",
-  vendor: "bg-blue-500/10 text-blue-500 border-blue-500/30",
-  user: "bg-green-500/10 text-green-500 border-green-500/30",
+const roleColors: Record<string, string> = {
+  ADMIN: "bg-purple-500/10 text-purple-500 border-purple-500/30",
+  VENDOR: "bg-blue-500/10 text-blue-500 border-blue-500/30",
+  CREATOR: "bg-green-500/10 text-green-500 border-green-500/30",
 };
 
-const roleIcons = {
-  admin: Shield,
-  vendor: Store,
-  user: UserIcon,
+const roleIcons: Record<string, typeof Shield> = {
+  ADMIN: Shield,
+  VENDOR: Store,
+  CREATOR: UserIcon,
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { users, isLoading, error, fetchUsers, updateUser, deleteUser, resetUserQuota, createUser } =
+    useAdminStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editQuota, setEditQuota] = useState(0);
-  const [page, setPage] = useState(1);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [editData, setEditData] = useState({ daily_limit: 0, role: "", is_unlimited: false });
+  const [newUserData, setNewUserData] = useState({ email: "", role: "CREATOR", daily_limit: 10, is_unlimited: false });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const data = await api.getUsers(page, 20);
-        setUsers(data);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        // Mock data for demo
-        setUsers([
-          {
-            id: "1",
-            email: "admin@macondo.ai",
-            name: "Admin Principal",
-            role: "admin",
-            quota: 10000,
-            used_quota: 1234,
-            created_at: "2024-01-15",
-            is_active: true,
-          },
-          {
-            id: "2",
-            email: "vendor1@example.com",
-            name: "Vendor Alpha",
-            role: "vendor",
-            quota: 5000,
-            used_quota: 2341,
-            created_at: "2024-02-20",
-            is_active: true,
-          },
-          {
-            id: "3",
-            email: "user1@example.com",
-            name: "Juan Garcia",
-            role: "user",
-            quota: 100,
-            used_quota: 45,
-            created_at: "2024-03-10",
-            is_active: true,
-          },
-          {
-            id: "4",
-            email: "user2@example.com",
-            name: "Maria Lopez",
-            role: "user",
-            quota: 200,
-            used_quota: 189,
-            created_at: "2024-03-15",
-            is_active: true,
-          },
-          {
-            id: "5",
-            email: "vendor2@example.com",
-            name: "Vendor Beta",
-            role: "vendor",
-            quota: 3000,
-            used_quota: 567,
-            created_at: "2024-03-20",
-            is_active: false,
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchUsers();
-  }, [page]);
+  }, [fetchUsers]);
 
   const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+    const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === "all" || user.role.toUpperCase() === roleFilter.toUpperCase();
     return matchesSearch && matchesRole;
   });
 
-  const handleToggleStatus = async (userId: string) => {
-    try {
-      await api.toggleUserStatus(userId);
-      setUsers(
-        users.map((u) =>
-          u.id === userId ? { ...u, is_active: !u.is_active } : u
-        )
-      );
-    } catch (error) {
-      console.error("Error toggling user status:", error);
+  const handleEditUser = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (user) {
+      setSelectedUserId(userId);
+      setEditData({
+        daily_limit: user.daily_limit,
+        role: user.role,
+        is_unlimited: user.is_unlimited,
+      });
+      setShowEditModal(true);
     }
     setMenuOpen(null);
   };
 
-  const handleUpdateQuota = async () => {
-    if (!selectedUser) return;
-    try {
-      await api.updateUserQuota({ user_id: selectedUser.id, quota: editQuota });
-      setUsers(
-        users.map((u) =>
-          u.id === selectedUser.id ? { ...u, quota: editQuota } : u
-        )
-      );
-      setShowEditModal(false);
-      setSelectedUser(null);
-    } catch (error) {
-      console.error("Error updating quota:", error);
-    }
+  const handleSaveEdit = async () => {
+    if (!selectedUserId) return;
+    await updateUser(selectedUserId, editData);
+    setShowEditModal(false);
+    setSelectedUserId(null);
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Estas seguro de eliminar este usuario?")) return;
-    try {
-      await api.deleteUser(userId);
-      setUsers(users.filter((u) => u.id !== userId));
-    } catch (error) {
-      console.error("Error deleting user:", error);
-    }
+    await deleteUser(userId);
     setMenuOpen(null);
+  };
+
+  const handleResetQuota = async (userId: string) => {
+    await resetUserQuota(userId);
+    setMenuOpen(null);
+  };
+
+  const handleCreateUser = async () => {
+    await createUser(newUserData);
+    setShowCreateModal(false);
+    setNewUserData({ email: "", role: "CREATOR", daily_limit: 10, is_unlimited: false });
   };
 
   return (
@@ -176,11 +110,18 @@ export default function AdminUsersPage() {
             Gestiona todos los usuarios de la plataforma
           </p>
         </div>
-        <Button variant="gradient" size="lg">
+        <Button variant="gradient" size="lg" onClick={() => setShowCreateModal(true)}>
           <UserPlus className="h-5 w-5" />
           Crear Usuario
         </Button>
       </motion.div>
+
+      {/* Error display */}
+      {error && (
+        <div className="rounded-lg bg-destructive/10 p-4 text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <motion.div
@@ -191,7 +132,7 @@ export default function AdminUsersPage() {
       >
         <div className="flex-1">
           <Input
-            placeholder="Buscar por nombre o email..."
+            placeholder="Buscar por email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             icon={<Search className="h-5 w-5" />}
@@ -205,9 +146,9 @@ export default function AdminUsersPage() {
             className="rounded-xl border-2 border-input bg-card px-4 py-3 text-base text-foreground focus:border-primary focus:outline-none"
           >
             <option value="all">Todos los roles</option>
-            <option value="admin">Administradores</option>
-            <option value="vendor">Vendors</option>
-            <option value="user">Usuarios</option>
+            <option value="ADMIN">Administradores</option>
+            <option value="VENDOR">Vendors</option>
+            <option value="CREATOR">Creadores</option>
           </select>
         </div>
       </motion.div>
@@ -241,9 +182,6 @@ export default function AdminUsersPage() {
                       <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
                         Estado
                       </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                        Registro
-                      </th>
                       <th className="px-6 py-4 text-right text-sm font-semibold text-muted-foreground">
                         Acciones
                       </th>
@@ -251,8 +189,11 @@ export default function AdminUsersPage() {
                   </thead>
                   <tbody>
                     {filteredUsers.map((user, index) => {
-                      const RoleIcon = roleIcons[user.role];
-                      const quotaPercent = (user.used_quota / user.quota) * 100;
+                      const role = user.role.toUpperCase();
+                      const RoleIcon = roleIcons[role] || UserIcon;
+                      const quotaPercent = user.is_unlimited
+                        ? 0
+                        : (user.used_quota / user.daily_limit) * 100;
                       return (
                         <motion.tr
                           key={user.id}
@@ -264,14 +205,14 @@ export default function AdminUsersPage() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-lg font-bold text-white">
-                                {user.name.charAt(0).toUpperCase()}
+                                {user.email.charAt(0).toUpperCase()}
                               </div>
                               <div>
                                 <p className="font-semibold text-foreground">
-                                  {user.name}
+                                  {user.email}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {user.email}
+                                  ID: {user.id.slice(0, 8)}...
                                 </p>
                               </div>
                             </div>
@@ -279,58 +220,52 @@ export default function AdminUsersPage() {
                           <td className="px-6 py-4">
                             <span
                               className={cn(
-                                "inline-flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium capitalize",
-                                roleColors[user.role]
+                                "inline-flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium",
+                                roleColors[role] || roleColors.CREATOR
                               )}
                             >
                               <RoleIcon className="h-4 w-4" />
-                              {user.role}
+                              {role}
                             </span>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="w-32">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-foreground">
-                                  {user.used_quota}/{user.quota}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {quotaPercent.toFixed(0)}%
-                                </span>
+                            {user.is_unlimited ? (
+                              <span className="rounded-lg bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                                Ilimitado
+                              </span>
+                            ) : (
+                              <div className="w-32">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-foreground">
+                                    {user.used_quota}/{user.daily_limit}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {quotaPercent.toFixed(0)}%
+                                  </span>
+                                </div>
+                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-secondary">
+                                  <div
+                                    className={cn(
+                                      "h-full rounded-full transition-all",
+                                      quotaPercent > 90
+                                        ? "bg-destructive"
+                                        : quotaPercent > 70
+                                        ? "bg-yellow-500"
+                                        : "bg-green-500"
+                                    )}
+                                    style={{
+                                      width: `${Math.min(quotaPercent, 100)}%`,
+                                    }}
+                                  />
+                                </div>
                               </div>
-                              <div className="mt-1 h-2 overflow-hidden rounded-full bg-secondary">
-                                <div
-                                  className={cn(
-                                    "h-full rounded-full transition-all",
-                                    quotaPercent > 90
-                                      ? "bg-destructive"
-                                      : quotaPercent > 70
-                                      ? "bg-warning"
-                                      : "bg-success"
-                                  )}
-                                  style={{ width: `${Math.min(quotaPercent, 100)}%` }}
-                                />
-                              </div>
-                            </div>
+                            )}
                           </td>
                           <td className="px-6 py-4">
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium",
-                                user.is_active
-                                  ? "bg-success/10 text-success"
-                                  : "bg-destructive/10 text-destructive"
-                              )}
-                            >
-                              {user.is_active ? (
-                                <Check className="h-4 w-4" />
-                              ) : (
-                                <X className="h-4 w-4" />
-                              )}
-                              {user.is_active ? "Activo" : "Inactivo"}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-3 py-1 text-sm font-medium text-green-500">
+                              <Check className="h-4 w-4" />
+                              Activo
                             </span>
-                          </td>
-                          <td className="px-6 py-4 text-muted-foreground">
-                            {formatDate(user.created_at)}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="relative">
@@ -351,32 +286,18 @@ export default function AdminUsersPage() {
                                     className="absolute right-0 top-full z-10 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-xl"
                                   >
                                     <button
-                                      onClick={() => {
-                                        setSelectedUser(user);
-                                        setEditQuota(user.quota);
-                                        setShowEditModal(true);
-                                        setMenuOpen(null);
-                                      }}
+                                      onClick={() => handleEditUser(user.id)}
                                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-secondary"
                                     >
                                       <Edit2 className="h-4 w-4" />
-                                      Editar cuota
+                                      Editar
                                     </button>
                                     <button
-                                      onClick={() => handleToggleStatus(user.id)}
+                                      onClick={() => handleResetQuota(user.id)}
                                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-secondary"
                                     >
-                                      {user.is_active ? (
-                                        <>
-                                          <X className="h-4 w-4" />
-                                          Desactivar
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Check className="h-4 w-4" />
-                                          Activar
-                                        </>
-                                      )}
+                                      <RotateCcw className="h-4 w-4" />
+                                      Resetear cuota
                                     </button>
                                     <button
                                       onClick={() => handleDeleteUser(user.id)}
@@ -401,29 +322,9 @@ export default function AdminUsersPage() {
         </Card>
       </motion.div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(Math.max(1, page - 1))}
-          disabled={page === 1}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="px-4 text-muted-foreground">Pagina {page}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage(page + 1)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Edit Quota Modal */}
+      {/* Edit Modal */}
       <AnimatePresence>
-        {showEditModal && selectedUser && (
+        {showEditModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -438,20 +339,55 @@ export default function AdminUsersPage() {
               className="w-full max-w-md rounded-2xl bg-card p-6"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-2xl font-bold text-foreground">Editar Cuota</h3>
-              <p className="mt-2 text-muted-foreground">
-                Usuario: {selectedUser.name}
-              </p>
-              <div className="mt-6">
-                <label className="block text-base font-medium text-foreground">
-                  Nueva cuota
-                </label>
-                <input
-                  type="number"
-                  value={editQuota}
-                  onChange={(e) => setEditQuota(Number(e.target.value))}
-                  className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-lg text-foreground focus:border-primary focus:outline-none"
-                />
+              <h3 className="text-2xl font-bold text-foreground">Editar Usuario</h3>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="block text-base font-medium text-foreground">
+                    Rol
+                  </label>
+                  <select
+                    value={editData.role}
+                    onChange={(e) =>
+                      setEditData({ ...editData, role: e.target.value })
+                    }
+                    className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="CREATOR">Creador</option>
+                    <option value="VENDOR">Vendor</option>
+                    <option value="ADMIN">Administrador</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-base font-medium text-foreground">
+                    Cuota Diaria
+                  </label>
+                  <input
+                    type="number"
+                    value={editData.daily_limit}
+                    onChange={(e) =>
+                      setEditData({
+                        ...editData,
+                        daily_limit: Number(e.target.value),
+                      })
+                    }
+                    disabled={editData.is_unlimited}
+                    className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="is_unlimited"
+                    checked={editData.is_unlimited}
+                    onChange={(e) =>
+                      setEditData({ ...editData, is_unlimited: e.target.checked })
+                    }
+                    className="h-5 w-5 rounded border-input"
+                  />
+                  <label htmlFor="is_unlimited" className="text-foreground">
+                    Cuota ilimitada
+                  </label>
+                </div>
               </div>
               <div className="mt-6 flex gap-3">
                 <Button
@@ -461,8 +397,111 @@ export default function AdminUsersPage() {
                 >
                   Cancelar
                 </Button>
-                <Button variant="gradient" className="flex-1" onClick={handleUpdateQuota}>
+                <Button variant="gradient" className="flex-1" onClick={handleSaveEdit}>
                   Guardar
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Modal */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md rounded-2xl bg-card p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-2xl font-bold text-foreground">Crear Usuario</h3>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="block text-base font-medium text-foreground">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newUserData.email}
+                    onChange={(e) =>
+                      setNewUserData({ ...newUserData, email: e.target.value })
+                    }
+                    placeholder="usuario@ejemplo.com"
+                    className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-base font-medium text-foreground">
+                    Rol
+                  </label>
+                  <select
+                    value={newUserData.role}
+                    onChange={(e) =>
+                      setNewUserData({ ...newUserData, role: e.target.value })
+                    }
+                    className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="CREATOR">Creador</option>
+                    <option value="VENDOR">Vendor</option>
+                    <option value="ADMIN">Administrador</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-base font-medium text-foreground">
+                    Cuota Diaria
+                  </label>
+                  <input
+                    type="number"
+                    value={newUserData.daily_limit}
+                    onChange={(e) =>
+                      setNewUserData({
+                        ...newUserData,
+                        daily_limit: Number(e.target.value),
+                      })
+                    }
+                    disabled={newUserData.is_unlimited}
+                    className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="new_is_unlimited"
+                    checked={newUserData.is_unlimited}
+                    onChange={(e) =>
+                      setNewUserData({ ...newUserData, is_unlimited: e.target.checked })
+                    }
+                    className="h-5 w-5 rounded border-input"
+                  />
+                  <label htmlFor="new_is_unlimited" className="text-foreground">
+                    Cuota ilimitada
+                  </label>
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="gradient"
+                  className="flex-1"
+                  onClick={handleCreateUser}
+                  disabled={!newUserData.email}
+                >
+                  Crear
                 </Button>
               </div>
             </motion.div>
