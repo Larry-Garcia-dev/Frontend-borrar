@@ -6,6 +6,14 @@ const API_PREFIX = "/api/v1";
 const API_PREFIX_ADMIN = "/api/admin"; // Admin usa /api/admin (sin v1)
 const API_PREFIX_VENDOR = "/api/vendor"; // Vendor usa /api/vendor (sin v1)
 
+// Helper para resolver URLs de media
+export function resolveMediaUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/")) return `${API_BASE_URL}${url}`;
+  return url;
+}
+
 // Types
 export interface User {
   id: string;
@@ -323,6 +331,13 @@ class APIClient {
 
   async getPromptTemplates(): Promise<PromptTemplate[]> {
     return this.request<PromptTemplate[]>("/generation/prompt-templates");
+  }
+
+  async reportMedia(mediaId: string, reason: string): Promise<ImageReport> {
+    return this.request<ImageReport>(`/generation/${mediaId}/report`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    });
   }
 
   async uploadReferenceImages(files: File[]): Promise<{ urls: string[] }> {

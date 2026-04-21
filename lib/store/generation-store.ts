@@ -4,6 +4,7 @@ import {
   GeneratedMedia,
   GenerationRequest,
   PromptTemplate,
+  resolveMediaUrl,
 } from "@/lib/api-client";
 
 interface GenerationState {
@@ -28,9 +29,8 @@ interface GenerationState {
   model: string;
   templateId: string | null;
   parentMediaId: string | null;
-  steps: number;
-  guidance: number;
-  seed: number | null;
+  parentEditCount: number;
+  selectedSize: string;
 
   // Actions
   setPrompt: (prompt: string) => void;
@@ -43,9 +43,11 @@ interface GenerationState {
   setModel: (model: string) => void;
   setTemplateId: (id: string | null) => void;
   setParentMediaId: (id: string | null) => void;
-  setSteps: (steps: number) => void;
-  setGuidance: (guidance: number) => void;
-  setSeed: (seed: number | null) => void;
+  setParentEditCount: (count: number) => void;
+  setSelectedSize: (size: string) => void;
+  startEdit: (mediaId: string, editCount: number) => void;
+  cancelEdit: () => void;
+  reportMedia: (mediaId: string, reason: string) => Promise<void>;
 
   generate: () => Promise<GeneratedMedia | null>;
   fetchGenerations: () => Promise<void>;
@@ -77,9 +79,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   model: "qwen-image-2.0-pro",
   templateId: null,
   parentMediaId: null,
-  steps: 30,
-  guidance: 7.5,
-  seed: null,
+  parentEditCount: 0,
+  selectedSize: "1080x1080 (1:1)",
 
   setPrompt: (prompt) => set({ prompt }),
   setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
@@ -91,9 +92,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   setModel: (model) => set({ model }),
   setTemplateId: (id) => set({ templateId: id }),
   setParentMediaId: (id) => set({ parentMediaId: id }),
-  setSteps: (steps) => set({ steps }),
-  setGuidance: (guidance) => set({ guidance }),
-  setSeed: (seed) => set({ seed }),
+  setParentEditCount: (count) => set({ parentEditCount: count }),
+  setSelectedSize: (size) => set({ selectedSize: size }),
+  startEdit: (mediaId, editCount) => set({ parentMediaId: mediaId, parentEditCount: editCount }),
+  cancelEdit: () => set({ parentMediaId: null, parentEditCount: 0 }),
+  reportMedia: async (mediaId, reason) => {
+    await api.reportMedia(mediaId, reason);
+  },
 
   generate: async () => {
     const state = get();
@@ -148,14 +153,21 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       );
 
       if (result) {
+        // Resolver URL de media
+        const resolvedResult = {
+          ...result,
+          storage_url: resolveMediaUrl(result.storage_url),
+        };
         set({
-          currentGeneration: result,
-          generations: [result, ...get().generations],
+          currentGeneration: resolvedResult,
+          generations: [resolvedResult, ...get().generations],
           isGenerating: false,
           progress: 100,
           taskStatus: "success",
+          parentMediaId: null,
+          parentEditCount: 0,
         });
-        return result;
+        return resolvedResult;
       }
 
       set({ isGenerating: false, progress: 0, taskStatus: "" });
@@ -176,7 +188,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const generations = await api.getGenerations();
-      set({ generations, isLoading: false });
+      // Resolver URLs de media
+      const resolvedGenerations = generations.map((g) => ({
+        ...g,
+        storage_url: resolveMediaUrl(g.storage_url),
+      }));
+      set({ generations: resolvedGenerations, isLoading: false });
     } catch (error) {
       set({
         error:
@@ -226,9 +243,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       model: "qwen-image-2.0-pro",
       templateId: null,
       parentMediaId: null,
-      steps: 30,
-      guidance: 7.5,
-      seed: null,
+      parentEditCount: 0,
+      selectedSize: "1080x1080 (1:1)",
       currentGeneration: null,
       progress: 0,
       taskStatus: "",
