@@ -21,6 +21,7 @@ import { ParticleLoader } from "@/components/ui/particle-loader";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { cn } from "@/lib/utils";
+import { ProtectedImage } from "@/components/protected-image";
 
 // Size presets matching the legacy frontend
 const SIZE_OPTIONS = [
@@ -419,10 +420,12 @@ export default function DashboardPage() {
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="relative h-full"
                     >
-                      <img
+                      <ProtectedImage
                         src={currentGeneration.storage_url}
                         alt={currentGeneration.prompt}
                         className="h-full w-full object-contain"
+                        isApproved={isApproved}
+                        watermarkText="PENDIENTE DE APROBACION"
                       />
                     </motion.div>
                   ) : (
