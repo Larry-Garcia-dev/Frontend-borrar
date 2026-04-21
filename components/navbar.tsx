@@ -28,7 +28,6 @@ const navLinks = [
 const adminLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Usuarios", icon: Users },
-  { href: "/admin/settings", label: "Ajustes", icon: Settings },
 ];
 
 const vendorLinks = [
@@ -41,16 +40,24 @@ export function Navbar() {
   const { user, logout, isAuthenticated } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
-  const isAdmin = user?.role === "admin";
-  const isVendor = user?.role === "vendor";
+  const isAdmin = user?.isAdmin;
+  const isVendor = user?.isVendor;
+
+  // Calculate remaining credits
+  const remainingCredits = user
+    ? user.isUnlimited
+      ? "Ilimitado"
+      : user.dailyLimit - user.usedQuota
+    : 0;
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-3">
             <motion.div
               whileHover={{ scale: 1.05, rotate: 5 }}
               className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg"
@@ -83,37 +90,74 @@ export function Navbar() {
                   );
                 })}
 
-                {/* Admin/Vendor dropdown */}
-                {(isAdmin || isVendor) && (
+                {/* Admin dropdown */}
+                {isAdmin && (
                   <div className="relative">
                     <Button
                       variant="ghost"
                       className="gap-2 text-base"
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      onClick={() => setAdminMenuOpen(!adminMenuOpen)}
                     >
-                      {isAdmin ? (
-                        <Settings className="h-5 w-5" />
-                      ) : (
-                        <Store className="h-5 w-5" />
-                      )}
-                      {isAdmin ? "Admin" : "Vendor"}
+                      <Settings className="h-5 w-5" />
+                      Admin
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                     <AnimatePresence>
-                      {userMenuOpen && (
+                      {adminMenuOpen && (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 10 }}
                           className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-xl"
                         >
-                          {(isAdmin ? adminLinks : vendorLinks).map((link) => {
+                          {adminLinks.map((link) => {
                             const Icon = link.icon;
                             return (
                               <Link
                                 key={link.href}
                                 href={link.href}
-                                onClick={() => setUserMenuOpen(false)}
+                                onClick={() => setAdminMenuOpen(false)}
+                              >
+                                <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-base hover:bg-secondary">
+                                  <Icon className="h-5 w-5" />
+                                  {link.label}
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Vendor dropdown */}
+                {isVendor && (
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      className="gap-2 text-base"
+                      onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                    >
+                      <Store className="h-5 w-5" />
+                      Vendor
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <AnimatePresence>
+                      {adminMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-xl"
+                        >
+                          {vendorLinks.map((link) => {
+                            const Icon = link.icon;
+                            return (
+                              <Link
+                                key={link.href}
+                                href={link.href}
+                                onClick={() => setAdminMenuOpen(false)}
                               >
                                 <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-base hover:bg-secondary">
                                   <Icon className="h-5 w-5" />
@@ -140,7 +184,7 @@ export function Navbar() {
                   <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2">
                     <Sparkles className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">
-                      {user.quota - user.used_quota} creditos
+                      {remainingCredits} creditos
                     </span>
                   </div>
                 )}
@@ -152,10 +196,10 @@ export function Navbar() {
                     className="flex items-center gap-3 rounded-xl bg-secondary px-4 py-2 transition-colors hover:bg-secondary/80"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-lg font-bold text-white">
-                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                      {user?.email?.charAt(0).toUpperCase() || "U"}
                     </div>
                     <div className="text-left">
-                      <p className="text-sm font-semibold">{user?.name}</p>
+                      <p className="text-sm font-semibold">{user?.email}</p>
                       <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                     </div>
                     <ChevronDown className="h-4 w-4" />
@@ -191,11 +235,6 @@ export function Navbar() {
                     Iniciar Sesion
                   </Button>
                 </Link>
-                <Link href="/register">
-                  <Button variant="gradient" size="lg">
-                    Registrarse
-                  </Button>
-                </Link>
               </div>
             )}
           </div>
@@ -222,6 +261,16 @@ export function Navbar() {
             <div className="space-y-2 p-4">
               {isAuthenticated ? (
                 <>
+                  {/* Credits on mobile */}
+                  {user && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-3 mb-4">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">
+                        {remainingCredits} creditos
+                      </span>
+                    </div>
+                  )}
+
                   {navLinks.map((link) => {
                     const Icon = link.icon;
                     return (
@@ -238,21 +287,39 @@ export function Navbar() {
                     );
                   })}
 
-                  {(isAdmin ? adminLinks : isVendor ? vendorLinks : []).map((link) => {
-                    const Icon = link.icon;
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-lg hover:bg-secondary">
-                          <Icon className="h-5 w-5" />
-                          {link.label}
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  {isAdmin &&
+                    adminLinks.map((link) => {
+                      const Icon = link.icon;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-lg hover:bg-secondary">
+                            <Icon className="h-5 w-5" />
+                            {link.label}
+                          </div>
+                        </Link>
+                      );
+                    })}
+
+                  {isVendor &&
+                    vendorLinks.map((link) => {
+                      const Icon = link.icon;
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-lg hover:bg-secondary">
+                            <Icon className="h-5 w-5" />
+                            {link.label}
+                          </div>
+                        </Link>
+                      );
+                    })}
 
                   <button
                     onClick={() => {
@@ -270,11 +337,6 @@ export function Navbar() {
                   <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="outline" size="lg" className="w-full">
                       Iniciar Sesion
-                    </Button>
-                  </Link>
-                  <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="gradient" size="lg" className="w-full">
-                      Registrarse
                     </Button>
                   </Link>
                 </>

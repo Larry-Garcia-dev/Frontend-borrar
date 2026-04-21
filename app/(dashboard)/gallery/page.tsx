@@ -16,13 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGenerationStore } from "@/lib/store/generation-store";
-import { GeneratedImage } from "@/lib/api-client";
+import { GeneratedMedia } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 
 export default function GalleryPage() {
   const { generations, fetchGenerations, deleteGeneration, isLoading } =
     useGenerationStore();
-  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GeneratedMedia | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
 
@@ -127,7 +127,7 @@ export default function GalleryPage() {
               <Card className="overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
                 <div className="relative aspect-square overflow-hidden">
                   <img
-                    src={image.image_url}
+                    src={image.storage_url}
                     alt={image.prompt}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
@@ -178,11 +178,11 @@ export default function GalleryPage() {
                 <X className="h-6 w-6" />
               </button>
 
-              <div className="grid md:grid-cols-2">
+                <div className="grid md:grid-cols-2">
                 {/* Image */}
                 <div className="relative aspect-square">
                   <img
-                    src={selectedImage.image_url}
+                    src={selectedImage.storage_url}
                     alt={selectedImage.prompt}
                     className="h-full w-full object-contain"
                   />
@@ -242,7 +242,7 @@ export default function GalleryPage() {
                       className="flex-1"
                       onClick={() => {
                         const link = document.createElement("a");
-                        link.href = selectedImage.image_url;
+                        link.href = selectedImage.storage_url;
                         link.download = `macondo-${selectedImage.id}.png`;
                         link.click();
                       }}

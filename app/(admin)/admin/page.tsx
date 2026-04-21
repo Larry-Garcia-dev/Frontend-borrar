@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -10,9 +10,10 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
+  Shield,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, AdminStats } from "@/lib/api-client";
+import { useAdminStore } from "@/lib/store/admin-store";
 import { formatNumber } from "@/lib/utils";
 
 const statCards = [
@@ -21,60 +22,34 @@ const statCards = [
     label: "Total Usuarios",
     icon: Users,
     color: "from-blue-500 to-blue-600",
-    change: "+12%",
-    trend: "up",
   },
   {
-    key: "total_vendors",
-    label: "Vendors",
-    icon: TrendingUp,
+    key: "admin_count",
+    label: "Administradores",
+    icon: Shield,
     color: "from-purple-500 to-purple-600",
-    change: "+5%",
-    trend: "up",
   },
   {
-    key: "total_generations",
+    key: "total_media",
     label: "Generaciones",
     icon: ImageIcon,
     color: "from-green-500 to-green-600",
-    change: "+23%",
-    trend: "up",
   },
   {
-    key: "active_today",
-    label: "Activos Hoy",
-    icon: Activity,
+    key: "total_cost_usd",
+    label: "Costo Total (USD)",
+    icon: DollarSign,
     color: "from-orange-500 to-orange-600",
-    change: "-3%",
-    trend: "down",
+    format: "currency",
   },
 ];
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { stats, isLoading, fetchStats } = useAdminStore();
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await api.getAdminStats();
-        setStats(data);
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-        // Use mock data for demo
-        setStats({
-          total_users: 1284,
-          total_vendors: 45,
-          total_generations: 52847,
-          active_today: 342,
-          revenue: 12450,
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   return (
     <div className="space-y-8">
@@ -95,8 +70,11 @@ export default function AdminDashboardPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
-          const value = stats?.[stat.key as keyof AdminStats] || 0;
-          const isUp = stat.trend === "up";
+          const value = stats?.[stat.key as keyof typeof stats] ?? 0;
+          const displayValue =
+            stat.format === "currency"
+              ? `$${formatNumber(value as number)}`
+              : formatNumber(value as number);
           return (
             <motion.div
               key={stat.key}
@@ -112,24 +90,10 @@ export default function AdminDashboardPage() {
                     >
                       <Icon className="h-7 w-7 text-white" />
                     </div>
-                    <div
-                      className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
-                        isUp
-                          ? "bg-green-500/10 text-green-500"
-                          : "bg-red-500/10 text-red-500"
-                      }`}
-                    >
-                      {isUp ? (
-                        <ArrowUpRight className="h-4 w-4" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4" />
-                      )}
-                      {stat.change}
-                    </div>
                   </div>
                   <div className="mt-4">
                     <p className="text-3xl font-bold text-foreground">
-                      {isLoading ? "..." : formatNumber(value as number)}
+                      {isLoading ? "..." : displayValue}
                     </p>
                     <p className="mt-1 text-base text-muted-foreground">
                       {stat.label}
@@ -142,62 +106,55 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
-      {/* Revenue Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card className="bg-gradient-to-br from-primary/10 to-accent/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-2xl">
-              <DollarSign className="h-6 w-6 text-primary" />
-              Ingresos del Mes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-5xl font-bold text-foreground">
-              ${isLoading ? "..." : formatNumber(stats?.revenue || 0)}
-            </p>
-            <p className="mt-2 text-lg text-muted-foreground">
-              Ingresos totales este mes
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Activity Section */}
+      {/* Quick Actions */}
       <div className="grid gap-6 lg:grid-cols-2">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.4 }}
         >
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Actividad Reciente</CardTitle>
+              <CardTitle className="text-xl">Acciones Rapidas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[
-                  { action: "Nuevo usuario registrado", time: "hace 5 min", type: "user" },
-                  { action: "Imagen generada", time: "hace 12 min", type: "image" },
-                  { action: "Vendor creado", time: "hace 1 hora", type: "vendor" },
-                  { action: "Cuota actualizada", time: "hace 2 horas", type: "quota" },
-                  { action: "Usuario desactivado", time: "hace 3 horas", type: "user" },
-                ].map((activity, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg bg-secondary/50 p-4"
-                  >
+              <div className="space-y-3">
+                <a
+                  href="/admin/users"
+                  className="flex items-center justify-between rounded-lg bg-secondary/50 p-4 transition-colors hover:bg-secondary"
+                >
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-primary" />
                     <span className="font-medium text-foreground">
-                      {activity.action}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {activity.time}
+                      Gestionar Usuarios
                     </span>
                   </div>
-                ))}
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground" />
+                </a>
+                <a
+                  href="/admin/reports"
+                  className="flex items-center justify-between rounded-lg bg-secondary/50 p-4 transition-colors hover:bg-secondary"
+                >
+                  <div className="flex items-center gap-3">
+                    <Activity className="h-5 w-5 text-primary" />
+                    <span className="font-medium text-foreground">
+                      Ver Reportes
+                    </span>
+                  </div>
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground" />
+                </a>
+                <a
+                  href="/admin/costs"
+                  className="flex items-center justify-between rounded-lg bg-secondary/50 p-4 transition-colors hover:bg-secondary"
+                >
+                  <div className="flex items-center gap-3">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    <span className="font-medium text-foreground">
+                      Ver Costos por Usuario
+                    </span>
+                  </div>
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground" />
+                </a>
               </div>
             </CardContent>
           </Card>
@@ -206,39 +163,39 @@ export default function AdminDashboardPage() {
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.5 }}
         >
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Top Vendors</CardTitle>
+              <CardTitle className="text-xl">Resumen del Sistema</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { name: "Vendor Alpha", users: 245, generations: 12340 },
-                  { name: "Vendor Beta", users: 189, generations: 9870 },
-                  { name: "Vendor Gamma", users: 156, generations: 7650 },
-                  { name: "Vendor Delta", users: 98, generations: 4320 },
-                  { name: "Vendor Epsilon", users: 67, generations: 2890 },
-                ].map((vendor, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-lg bg-secondary/50 p-4"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">{vendor.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {vendor.users} usuarios
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-primary">
-                        {formatNumber(vendor.generations)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">generaciones</p>
-                    </div>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-4">
+                  <span className="text-muted-foreground">Total Usuarios</span>
+                  <span className="font-bold text-foreground">
+                    {isLoading ? "..." : formatNumber(stats?.total_users ?? 0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-4">
+                  <span className="text-muted-foreground">
+                    Total Generaciones
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {isLoading ? "..." : formatNumber(stats?.total_media ?? 0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-secondary/50 p-4">
+                  <span className="text-muted-foreground">
+                    Costo Total (USD)
+                  </span>
+                  <span className="font-bold text-primary">
+                    $
+                    {isLoading
+                      ? "..."
+                      : formatNumber(stats?.total_cost_usd ?? 0)}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>

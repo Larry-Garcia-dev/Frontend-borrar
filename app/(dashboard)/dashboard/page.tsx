@@ -65,7 +65,7 @@ export default function DashboardPage() {
     await generate();
   };
 
-  const remainingCredits = user ? user.quota - user.used_quota : 0;
+  const remainingCredits = user ? (user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota) : 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -98,7 +98,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="text-sm font-medium">
-                    {remainingCredits} creditos
+                    {user?.isUnlimited ? "Ilimitado" : remainingCredits} creditos
                   </span>
                 </div>
               </div>
@@ -264,14 +264,14 @@ export default function DashboardPage() {
                 size="xl"
                 className="w-full"
                 onClick={handleGenerate}
-                disabled={isGenerating || !prompt.trim() || remainingCredits <= 0}
+                disabled={isGenerating || !prompt.trim() || (!user?.isUnlimited && remainingCredits <= 0)}
                 isLoading={isGenerating}
               >
                 {!isGenerating && <Sparkles className="h-6 w-6" />}
                 {isGenerating ? "Generando..." : "Generar Imagen"}
               </Button>
 
-              {remainingCredits <= 0 && (
+              {!user?.isUnlimited && remainingCredits <= 0 && (
                 <p className="text-center text-sm text-destructive">
                   No tienes creditos disponibles. Contacta al administrador.
                 </p>
@@ -315,7 +315,7 @@ export default function DashboardPage() {
                       className="relative h-full"
                     >
                       <img
-                        src={currentGeneration.image_url}
+                        src={currentGeneration.storage_url}
                         alt={currentGeneration.prompt}
                         className="h-full w-full object-contain"
                       />
@@ -327,7 +327,7 @@ export default function DashboardPage() {
                           className="glass"
                           onClick={() => {
                             const link = document.createElement("a");
-                            link.href = currentGeneration.image_url;
+                            link.href = currentGeneration.storage_url;
                             link.download = `macondo-${currentGeneration.id}.png`;
                             link.click();
                           }}

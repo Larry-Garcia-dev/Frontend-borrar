@@ -3,18 +3,20 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API_PREFIX = "/api/v1";
+const API_PREFIX_ADMIN = "/api/admin"; // Admin usa /api/admin (sin v1)
+const API_PREFIX_VENDOR = "/api/vendor"; // Vendor usa /api/vendor (sin v1)
 
 // Types
 export interface User {
   id: string;
   email: string;
-  name: string;
-  role: "user" | "vendor" | "admin";
-  quota: number;
+  name?: string;
+  role: string;
+  daily_limit: number;
   used_quota: number;
-  created_at: string;
-  is_active: boolean;
+  is_unlimited: boolean;
   vendor_id?: string;
+  quota_reset_at?: string;
 }
 
 export interface GenerationRequest {
@@ -22,22 +24,43 @@ export interface GenerationRequest {
   negative_prompt?: string;
   width?: number;
   height?: number;
-  num_inference_steps?: number;
-  guidance_scale?: number;
-  seed?: number;
+  media_type?: string;
+  reference_image_url?: string;
+  reference_image_urls?: string[];
+  num_images?: number;
+  model?: string;
+  template_id?: string;
+  parent_media_id?: string;
 }
 
-export interface GeneratedImage {
-  id: string;
-  user_id: string;
-  prompt: string;
-  negative_prompt?: string;
-  image_url: string;
-  created_at: string;
-  width: number;
-  height: number;
-  seed: number;
+// Respuesta de crear generacion (tarea en cola)
+export interface GenerationTaskResponse {
+  task_id: string;
+  status: string;
+  detail: string;
 }
+
+// Estado de una tarea de generacion
+export interface TaskStatusResponse {
+  task_id: string;
+  status: string;
+  detail: string;
+}
+
+// Media generado (galeria)
+export interface GeneratedMedia {
+  id: string;
+  media_type: string;
+  prompt: string;
+  storage_url: string;
+  status: string;
+  created_at: string;
+  edit_count: number;
+  parent_media_id?: string;
+}
+
+// Alias para compatibilidad
+export interface GeneratedImage extends GeneratedMedia {}
 
 export interface LoginCredentials {
   email: string;
@@ -70,6 +93,17 @@ export interface GoogleCallbackResponse {
   quota_reset_at?: string;
 }
 
+// Respuesta de /auth/me
+export interface MeResponse {
+  email: string;
+  user_id: string;
+  daily_limit: number;
+  used_quota: number;
+  is_unlimited: boolean;
+  role: string;
+  quota_reset_at?: string;
+}
+
 export interface QuotaUpdate {
   user_id: string;
   quota: number;
@@ -85,10 +119,88 @@ export interface VendorStats {
 
 export interface AdminStats {
   total_users: number;
-  total_vendors: number;
-  total_generations: number;
-  active_today: number;
-  revenue: number;
+  total_media: number;
+  admin_count: number;
+  total_cost_usd: number;
+}
+
+// Admin user response
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: string;
+  daily_limit: number;
+  used_quota: number;
+  is_unlimited: boolean;
+  vendor_id?: string;
+}
+
+// Vendor user response
+export interface VendorUser {
+  id: string;
+  email: string;
+  role: string;
+  daily_limit: number;
+  used_quota: number;
+  is_unlimited: boolean;
+  quota_reset_at?: string;
+}
+
+// Prompt template
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  description: string;
+}
+
+// Image report
+export interface ImageReport {
+  id: string;
+  media_id: string;
+  user_id: string;
+  reason: string;
+  status: string;
+  admin_note?: string;
+  created_at: string;
+  reviewed_at?: string;
+}
+
+// User cost data
+export interface UserCost {
+  user_id: string;
+  email: string;
+  total_cost_usd: number;
+  media_count: number;
+}
+
+// User media (admin view)
+export interface UserMedia {
+  id: string;
+  media_type: string;
+  prompt: string;
+  storage_url: string;
+  created_at: string;
+  cost_usd?: number;
+  model_used?: string;
+}
+
+// Helper para obtener token de cookie
+function getTokenFromCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/(?:^|; )mf_access_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Helper para setear token en cookie
+function setTokenCookie(token: string | null) {
+  if (typeof document === "undefined") return;
+  if (token) {
+    // Cookie con expiracion de 7 dias
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = `mf_access_token=${encodeURIComponent(token)}; path=/; expires=${expires}; SameSite=Lax`;
+  } else {
+    document.cookie = "mf_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  }
 }
 
 // API Client class
@@ -97,16 +209,26 @@ class APIClient {
 
   constructor() {
     if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("auth_token");
+      // Primero intentar cookie, luego localStorage (para migracion)
+      this.token = getTokenFromCookie() || localStorage.getItem("auth_token");
+      // Si encontramos en localStorage pero no en cookie, migrar a cookie
+      if (this.token && !getTokenFromCookie()) {
+        setTokenCookie(this.token);
+        localStorage.removeItem("auth_token");
+      }
     }
+  }
+
+  getToken(): string | null {
+    return this.token;
   }
 
   setToken(token: string | null) {
     this.token = token;
     if (typeof window !== "undefined") {
+      setTokenCookie(token);
+      // Limpiar localStorage antiguo
       if (token) {
-        localStorage.setItem("auth_token", token);
-      } else {
         localStorage.removeItem("auth_token");
       }
     }
@@ -114,7 +236,8 @@ class APIClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    usePrefix: string = API_PREFIX
   ): Promise<T> {
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -125,9 +248,10 @@ class APIClient {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${usePrefix}${endpoint}`, {
       ...options,
       headers,
+      credentials: "include", // Incluir cookies en requests
     });
 
     if (!response.ok) {
@@ -135,26 +259,26 @@ class APIClient {
       throw new Error(error.detail || `Error: ${response.status}`);
     }
 
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return {} as T;
+    }
+
     return response.json();
   }
 
+  // ============================================
   // Auth endpoints
+  // ============================================
+
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(credentials),
-    });
-    this.setToken(response.access_token);
-    return response;
+    // Nota: El backend no implementa login con password, solo Google OAuth
+    throw new Error("Login con password no implementado. Usa Google OAuth.");
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-    this.setToken(response.access_token);
-    return response;
+    // Nota: El backend no implementa registro con password, solo Google OAuth
+    throw new Error("Registro con password no implementado. Usa Google OAuth.");
   }
 
   async loginWithGoogle(): Promise<void> {
@@ -174,88 +298,236 @@ class APIClient {
     this.setToken(null);
   }
 
-  async getCurrentUser(): Promise<User> {
-    return this.request<User>("/auth/me");
+  async getCurrentUser(): Promise<MeResponse> {
+    return this.request<MeResponse>("/auth/me");
   }
 
+  // ============================================
   // Generation endpoints
-  async generateImage(data: GenerationRequest): Promise<GeneratedImage> {
-    return this.request<GeneratedImage>("/generate", {
+  // ============================================
+
+  async createGeneration(data: GenerationRequest): Promise<GenerationTaskResponse> {
+    return this.request<GenerationTaskResponse>("/generation/", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
-  async getGenerations(page = 1, limit = 20): Promise<GeneratedImage[]> {
-    return this.request<GeneratedImage[]>(
-      `/generations?page=${page}&limit=${limit}`
+  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    return this.request<TaskStatusResponse>(`/generation/${taskId}`);
+  }
+
+  async getGenerations(): Promise<GeneratedMedia[]> {
+    return this.request<GeneratedMedia[]>("/generation/");
+  }
+
+  async getPromptTemplates(): Promise<PromptTemplate[]> {
+    return this.request<PromptTemplate[]>("/generation/prompt-templates");
+  }
+
+  async uploadReferenceImages(files: File[]): Promise<{ urls: string[] }> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const headers: HeadersInit = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_PREFIX}/generation/reference-images`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+        credentials: "include",
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `Error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Metodo de polling para esperar resultado de generacion
+  async waitForGeneration(
+    taskId: string,
+    onProgress?: (status: string, detail: string) => void,
+    maxAttempts: number = 120,
+    intervalMs: number = 2000
+  ): Promise<GeneratedMedia | null> {
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      const status = await this.getTaskStatus(taskId);
+      
+      if (onProgress) {
+        onProgress(status.status, status.detail);
+      }
+
+      if (status.status === "success") {
+        // Refetch media list to get the generated image
+        const media = await this.getGenerations();
+        // Return the most recent one
+        return media.length > 0 ? media[0] : null;
+      }
+
+      if (status.status === "failure") {
+        throw new Error(status.detail || "Error en la generacion");
+      }
+
+      // Wait before next poll
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      attempts++;
+    }
+
+    throw new Error("Tiempo de espera agotado para la generacion");
+  }
+
+  // Metodo legacy para compatibilidad
+  async generateImage(data: GenerationRequest): Promise<GeneratedMedia> {
+    const task = await this.createGeneration(data);
+    const result = await this.waitForGeneration(task.task_id);
+    if (!result) {
+      throw new Error("No se pudo obtener el resultado de la generacion");
+    }
+    return result;
+  }
+
+  // ============================================
+  // Admin endpoints (usa /api/admin)
+  // ============================================
+
+  async getAdminStats(): Promise<AdminStats> {
+    return this.request<AdminStats>("/stats", {}, API_PREFIX_ADMIN);
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return this.request<AdminUser[]>("/users", {}, API_PREFIX_ADMIN);
+  }
+
+  async createAdminUser(data: {
+    email: string;
+    role?: string;
+    daily_limit?: number;
+    is_unlimited?: boolean;
+  }): Promise<AdminUser> {
+    return this.request<AdminUser>(
+      "/users",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      API_PREFIX_ADMIN
     );
   }
 
-  async getGeneration(id: string): Promise<GeneratedImage> {
-    return this.request<GeneratedImage>(`/generations/${id}`);
+  async updateAdminUser(
+    userId: string,
+    data: {
+      daily_limit?: number;
+      role?: string;
+      is_unlimited?: boolean;
+    }
+  ): Promise<AdminUser> {
+    return this.request<AdminUser>(
+      `/users/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      API_PREFIX_ADMIN
+    );
   }
 
-  async deleteGeneration(id: string): Promise<void> {
-    await this.request(`/generations/${id}`, { method: "DELETE" });
+  async deleteAdminUser(userId: string): Promise<void> {
+    await this.request(`/users/${userId}`, { method: "DELETE" }, API_PREFIX_ADMIN);
   }
 
-  // User management (Admin/Vendor)
-  async getUsers(page = 1, limit = 20): Promise<User[]> {
-    return this.request<User[]>(`/users?page=${page}&limit=${limit}`);
+  async resetUserQuota(userId: string): Promise<AdminUser> {
+    return this.request<AdminUser>(
+      `/users/${userId}/reset-quota`,
+      { method: "POST" },
+      API_PREFIX_ADMIN
+    );
   }
 
-  async getUser(id: string): Promise<User> {
-    return this.request<User>(`/users/${id}`);
+  async getUsersCost(): Promise<UserCost[]> {
+    return this.request<UserCost[]>("/users-cost", {}, API_PREFIX_ADMIN);
   }
 
-  async updateUserQuota(data: QuotaUpdate): Promise<User> {
-    return this.request<User>(`/users/${data.user_id}/quota`, {
-      method: "PATCH",
-      body: JSON.stringify({ quota: data.quota }),
-    });
+  async getUserMedia(userId: string): Promise<UserMedia[]> {
+    return this.request<UserMedia[]>(`/users/${userId}/media`, {}, API_PREFIX_ADMIN);
   }
 
-  async toggleUserStatus(userId: string): Promise<User> {
-    return this.request<User>(`/users/${userId}/toggle-status`, {
-      method: "PATCH",
-    });
+  async getPendingReports(): Promise<ImageReport[]> {
+    return this.request<ImageReport[]>("/reports", {}, API_PREFIX_ADMIN);
   }
 
-  async deleteUser(userId: string): Promise<void> {
-    await this.request(`/users/${userId}`, { method: "DELETE" });
+  async approveReport(reportId: string): Promise<{ detail: string }> {
+    return this.request<{ detail: string }>(
+      `/reports/${reportId}/approve`,
+      { method: "POST" },
+      API_PREFIX_ADMIN
+    );
   }
 
-  // Vendor endpoints
-  async getVendorUsers(): Promise<User[]> {
-    return this.request<User[]>("/vendor/users");
+  async rejectReport(
+    reportId: string,
+    adminNote?: string
+  ): Promise<{ detail: string }> {
+    return this.request<{ detail: string }>(
+      `/reports/${reportId}/reject`,
+      {
+        method: "POST",
+        body: JSON.stringify({ admin_note: adminNote }),
+      },
+      API_PREFIX_ADMIN
+    );
   }
 
-  async getVendorStats(): Promise<VendorStats> {
-    return this.request<VendorStats>("/vendor/stats");
+  // ============================================
+  // Vendor endpoints (usa /api/vendor)
+  // ============================================
+
+  async getVendorUsers(): Promise<VendorUser[]> {
+    return this.request<VendorUser[]>("/users", {}, API_PREFIX_VENDOR);
   }
 
-  async createVendorUser(data: RegisterData): Promise<User> {
-    return this.request<User>("/vendor/users", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+  async createVendorUser(data: {
+    email: string;
+    name?: string;
+    daily_limit?: number;
+  }): Promise<VendorUser> {
+    return this.request<VendorUser>(
+      "/users",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      API_PREFIX_VENDOR
+    );
   }
 
-  // Admin endpoints
-  async getAdminStats(): Promise<AdminStats> {
-    return this.request<AdminStats>("/admin/stats");
+  async updateVendorUser(
+    userId: string,
+    data: { daily_limit: number }
+  ): Promise<VendorUser> {
+    return this.request<VendorUser>(
+      `/users/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      API_PREFIX_VENDOR
+    );
   }
 
-  async getVendors(): Promise<User[]> {
-    return this.request<User[]>("/admin/vendors");
-  }
-
-  async createVendor(data: RegisterData & { quota: number }): Promise<User> {
-    return this.request<User>("/admin/vendors", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+  async deleteVendorUser(userId: string): Promise<void> {
+    await this.request(`/users/${userId}`, { method: "DELETE" }, API_PREFIX_VENDOR);
   }
 }
 
