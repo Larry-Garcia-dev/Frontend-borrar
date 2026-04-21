@@ -60,7 +60,7 @@ def _notification_to_response(notification: Notification) -> NotificationRespons
         message=notification.message,
         related_entity_type=notification.related_entity_type,
         related_entity_id=str(notification.related_entity_id) if notification.related_entity_id else None,
-        metadata=notification.metadata,
+        metadata=notification.extra_data,
         is_read=notification.is_read,
         read_at=notification.read_at.isoformat() if notification.read_at else None,
         created_at=notification.created_at.isoformat(),
@@ -188,7 +188,7 @@ async def send_notification(
         message=data.message,
         related_entity_type=data.related_entity_type,
         related_entity_id=uuid.UUID(data.related_entity_id) if data.related_entity_id else None,
-        metadata=data.metadata,
+        extra_data=data.metadata,
     )
     db.add(notification)
     db.commit()
@@ -207,7 +207,7 @@ def create_notification(
     message: str,
     related_entity_type: Optional[str] = None,
     related_entity_id: Optional[uuid.UUID] = None,
-    metadata: Optional[dict] = None,
+    extra_data: Optional[dict] = None,
 ) -> Notification:
     """Create a notification for a user."""
     notification = Notification(
@@ -217,7 +217,7 @@ def create_notification(
         message=message,
         related_entity_type=related_entity_type,
         related_entity_id=related_entity_id,
-        metadata=metadata,
+        extra_data=extra_data,
     )
     db.add(notification)
     db.commit()

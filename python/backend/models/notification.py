@@ -66,7 +66,7 @@ class Notification(Base):
     related_entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     
     # Additional data as JSON
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    extra_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
     
     # Status
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -657,7 +657,6 @@ class APIClient {
   async deleteVendorUser(userId: string): Promise<void> {
     await this.request(`/users/${userId}`, { method: "DELETE" }, API_PREFIX_VENDOR);
   }
-}
 
   // ============================================
   // Notification endpoints
