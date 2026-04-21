@@ -23,21 +23,19 @@ class UserRole(str, enum.Enum):
     """Authorization role for a user.
     
     Hierarchy:
-    - SUPER_ADMIN: Full system access, financial records, all CRUD
-    - ADMIN: Macondo admin, can manage studios and models
-    - ESTUDIO: Studio/Vendor, can request to create models
-    - MODELO: Model/Creator, can generate and manage own photos
+    - MACONDO_ADMIN: Super admin, can create studios, set their limits, manage billing and global reports.
+    - ESTUDIO_ADMIN: Studio admin, can create/manage their models up to max_models_limit, and manage their photos.
+    - MODELO: Model/Creator, linked to an ESTUDIO_ADMIN, can only generate photos and submit reports.
     """
-    SUPER_ADMIN = "SUPER_ADMIN"
-    ADMIN = "ADMIN"
-    ESTUDIO = "ESTUDIO"  # Previously VENDOR
-    MODELO = "MODELO"    # Previously CREATOR
+    MACONDO_ADMIN = "MACONDO_ADMIN"
+    ESTUDIO_ADMIN = "ESTUDIO_ADMIN"
+    MODELO = "MODELO"
 
 
 class UserType(str, enum.Enum):
     """Type of model user for billing/features."""
     STUDIO_MODEL = "STUDIO_MODEL"      # Model belongs to a studio
-    INDEPENDENT_MODEL = "INDEPENDENT_MODEL"  # Independent model
+    INDEPENDENT_MODEL = "INDEPENDENT_MODEL"  # Independent model (optional for future use)
 
 
 class User(Base):
@@ -73,11 +71,15 @@ class User(Base):
         default=None,
     )
     
-    # Quota management
+    # --- Quota and Limits management ---
+    # Global limit of photos/credits for this user
     daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     used_quota: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_unlimited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     quota_reset_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Limit of models an ESTUDIO_ADMIN can create (Set by MACONDO_ADMIN)
+    max_models_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     
     # Studio relationship (for MODELO users belonging to a studio)
     studio_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -87,7 +89,7 @@ class User(Base):
         default=None
     )
     
-    # Legacy field - kept for compatibility
+    # Legacy field - kept for backward compatibility in DB, acts like studio_id
     vendor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, default=None
     )
@@ -139,21 +141,21 @@ class User(Base):
     )
     
     @property
+    def is_macondo_admin(self) -> bool:
+        """Check if user is a Macondo Admin (Super Admin)."""
+        return self.role == UserRole.MACONDO_ADMIN
+
+    @property
     def is_admin(self) -> bool:
-        """Check if user has admin privileges."""
-        return self.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
+        """Alias for backward compatibility: Check if user has admin privileges."""
+        return self.role == UserRole.MACONDO_ADMIN
     
     @property
-    def is_super_admin(self) -> bool:
-        """Check if user is super admin."""
-        return self.role == UserRole.SUPER_ADMIN
-    
-    @property
-    def is_studio(self) -> bool:
-        """Check if user is a studio."""
-        return self.role == UserRole.ESTUDIO
+    def is_studio_admin(self) -> bool:
+        """Check if user is a Studio Admin."""
+        return self.role == UserRole.ESTUDIO_ADMIN
     
     @property
     def is_model(self) -> bool:
-        """Check if user is a model."""
+        """Check if user is a Model."""
         return self.role == UserRole.MODELO

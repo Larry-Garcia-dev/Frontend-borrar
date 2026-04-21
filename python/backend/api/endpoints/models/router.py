@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,10 @@ from api.endpoints.notifications.router import create_notification
 
 router = APIRouter()
 
-
+# --- Importar y conectar el router de subida de archivos ---
+from api.endpoints.models.upload import router as upload_router
+router.include_router(upload_router)
+# -----------------------------------------------------------
 class ModelInfoRequest(BaseModel):
     """Model basic info for profile."""
     display_name: str

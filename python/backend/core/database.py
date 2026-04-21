@@ -74,6 +74,10 @@ def _sync_legacy_schema() -> None:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_unlimited BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_reset_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS vendor_id UUID"))
+        
+        # --- NUEVA COLUMNA DE LÍMITE DE MODELOS ---
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_models_limit INTEGER DEFAULT 5 NOT NULL"))
+
         # Ensure role column is VARCHAR to support all roles including VENDOR
         conn.execute(text(
             "DO $$ BEGIN "
@@ -88,18 +92,20 @@ def _sync_legacy_schema() -> None:
                     "WHERE google_id IS NULL AND google_sub IS NOT NULL"
                 )
             )
+        
+        # Actualizamos nombres a los nuevos Roles si vienen bases de datos heredadas
         if has_column("users", "is_admin"):
             conn.execute(
                 text(
                     "UPDATE users SET role = CASE "
-                    "WHEN COALESCE(is_admin, FALSE) THEN 'ADMIN' "
-                    "ELSE 'CREATOR' END "
+                    "WHEN COALESCE(is_admin, FALSE) THEN 'MACONDO_ADMIN' "
+                    "ELSE 'MODELO' END "
                     "WHERE role IS NULL"
                 )
             )
         else:
-            conn.execute(text("UPDATE users SET role = 'CREATOR' WHERE role IS NULL"))
-        conn.execute(text("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'CREATOR'"))
+            conn.execute(text("UPDATE users SET role = 'MODELO' WHERE role IS NULL"))
+        conn.execute(text("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'MODELO'"))
         conn.execute(text("ALTER TABLE users ALTER COLUMN role SET NOT NULL"))
 
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS prompt TEXT"))
@@ -131,7 +137,7 @@ def _sync_legacy_schema() -> None:
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS edit_count INTEGER NOT NULL DEFAULT 0"))
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS parent_media_id UUID"))
 
-        # Image reports table (Module C)
+        # Image reports table
         conn.execute(text(
             """
             CREATE TABLE IF NOT EXISTS image_reports (

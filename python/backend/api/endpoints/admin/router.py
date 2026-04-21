@@ -23,35 +23,51 @@ class UserResponse(BaseModel):
 
     id: UUID
     email: str
+    name: Optional[str] = None
     role: str
     daily_limit: int
     used_quota: int
     is_unlimited: bool
+    max_models_limit: int
     vendor_id: Optional[UUID] = None
+    studio_id: Optional[UUID] = None
 
 
 class UserUpdateRequest(BaseModel):
     daily_limit: Optional[int] = None
     role: Optional[str] = None
     is_unlimited: Optional[bool] = None
+    max_models_limit: Optional[int] = None
 
 
 class UserCreateRequest(BaseModel):
     email: str
-    role: Optional[str] = "CREATOR"
+    name: Optional[str] = None
+    role: Optional[str] = "MODELO"
     daily_limit: Optional[int] = 10
+    max_models_limit: Optional[int] = 5
     is_unlimited: Optional[bool] = False
+
+
+class StudioCreateRequest(BaseModel):
+    email: str
+    name: str
+    max_models_limit: int = 5
+    daily_limit: int = 100
 
 
 def _serialize_user(user: User) -> UserResponse:
     return UserResponse(
         id=user.id,
         email=user.email,
+        name=user.name,
         role=user.role.value if hasattr(user.role, "value") else str(user.role),
         daily_limit=user.daily_limit,
         used_quota=user.used_quota,
         is_unlimited=bool(user.is_unlimited),
+        max_models_limit=getattr(user, "max_models_limit", 5),
         vendor_id=user.vendor_id if hasattr(user, "vendor_id") else None,
+        studio_id=user.studio_id if hasattr(user, "studio_id") else None,
     )
 
 
@@ -60,8 +76,9 @@ async def get_admin_stats(db: Session = Depends(get_db)):
     """Return aggregate stats for the admin dashboard."""
     total_users = db.execute(select(func.count()).select_from(User)).scalar() or 0
     total_media = db.execute(select(func.count()).select_from(Media)).scalar() or 0
+    # Actualizado a MACONDO_ADMIN
     admin_count = db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.ADMIN)
+        select(func.count()).select_from(User).where(User.role == UserRole.MACONDO_ADMIN)
     ).scalar() or 0
     total_cost_usd = db.execute(
         select(func.coalesce(func.sum(Media.cost_usd), 0.0))
@@ -81,6 +98,27 @@ async def list_users(db: Session = Depends(get_db)) -> list[UserResponse]:
     return [_serialize_user(user) for user in users]
 
 
+@router.post("/studios", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_studio(payload: StudioCreateRequest, db: Session = Depends(get_db)) -> UserResponse:
+    """Acción exclusiva de Macondo Admin: Crear un nuevo Estudio."""
+    existing = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")
+
+    new_studio = User(
+        email=payload.email,
+        name=payload.name,
+        role=UserRole.ESTUDIO_ADMIN,
+        max_models_limit=payload.max_models_limit,
+        daily_limit=payload.daily_limit,
+        is_approved=True
+    )
+    db.add(new_studio)
+    db.commit()
+    db.refresh(new_studio)
+    return _serialize_user(new_studio)
+
+
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(payload: UserCreateRequest, db: Session = Depends(get_db)) -> UserResponse:
     """Create a new user manually from the admin panel."""
@@ -88,15 +126,21 @@ async def create_user(payload: UserCreateRequest, db: Session = Depends(get_db))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    normalized_role = (payload.role or "CREATOR").strip().upper()
+    normalized_role = (payload.role or "MODELO").strip().upper()
     if normalized_role not in UserRole.__members__:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="role must be ADMIN, CREATOR or VENDOR")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+            detail="role must be MACONDO_ADMIN, ESTUDIO_ADMIN or MODELO"
+        )
 
     user = User(
         email=payload.email,
+        name=payload.name,
         role=UserRole[normalized_role],
         daily_limit=payload.daily_limit if payload.daily_limit is not None else 10,
+        max_models_limit=payload.max_models_limit if payload.max_models_limit is not None else 5,
         is_unlimited=bool(payload.is_unlimited),
+        is_approved=True
     )
     db.add(user)
     db.commit()
@@ -123,12 +167,20 @@ async def update_user(
             )
         assign_plan(user, db, payload.daily_limit)
 
+    if payload.max_models_limit is not None:
+        if payload.max_models_limit < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="max_models_limit must be greater than or equal to 0",
+            )
+        user.max_models_limit = payload.max_models_limit
+
     if payload.role is not None:
         normalized_role = payload.role.strip().upper()
         if normalized_role not in UserRole.__members__:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="role must be ADMIN, CREATOR or VENDOR",
+                detail="role must be MACONDO_ADMIN, ESTUDIO_ADMIN or MODELO",
             )
         user.role = UserRole[normalized_role]
 
