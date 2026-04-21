@@ -76,5 +76,5 @@ class ImageReport(Base):
     )
 
     media: Mapped["Media"] = relationship()  # type: ignore[name-defined]  # noqa: F821
-    user: Mapped["User"] = relationship()  # type: ignore[name-defined]  # noqa: F821
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])  # type: ignore[name-defined]  # noqa: F821
     reviewed_by: Mapped[Optional["User"]] = relationship(foreign_keys=[reviewed_by_id])  # type: ignore[name-defined]  # noqa: F821

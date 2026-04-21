@@ -144,7 +144,7 @@ class UserBalance(Base):
     last_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     
     # Relationship
-    user: Mapped["User"] = relationship("User")
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
 
 
 class ActivityLog(Base):
@@ -188,4 +188,4 @@ class ActivityLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
     
     # Relationship
-    user: Mapped[Optional["User"]] = relationship("User")
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])

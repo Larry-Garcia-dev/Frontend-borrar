@@ -79,4 +79,4 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
     
     # Relationship
-    user: Mapped["User"] = relationship(back_populates="notifications")
+    user: Mapped["User"] = relationship(foreign_keys=[user_id], back_populates="notifications")
