@@ -78,8 +78,8 @@ class BillingRecord(Base):
         nullable=True,
     )
     
-    # Additional metadata
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    # Additional extra data
+    extra_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
     # Example: {"model_used": "wan2.6-image", "prompt_tokens": 100}
     
     # Who created this record (for manual adjustments)
@@ -183,7 +183,7 @@ class ActivityLog(Base):
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
+    extra_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
     

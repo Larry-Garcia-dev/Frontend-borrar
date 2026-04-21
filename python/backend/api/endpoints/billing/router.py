@@ -77,7 +77,7 @@ def _record_to_response(record: BillingRecord) -> BillingRecordResponse:
         description=record.description,
         amount_usd=float(record.amount_usd),
         media_id=str(record.media_id) if record.media_id else None,
-        metadata=record.metadata,
+        metadata=record.extra_data,
         created_at=record.created_at.isoformat(),
     )
 
@@ -268,7 +268,7 @@ async def record_payment(
         description=data.description,
         amount_usd=-abs(data.amount_usd),  # Payments are negative (credit)
         created_by_id=admin.id,
-        metadata=data.metadata,
+        extra_data=data.metadata,
     )
     db.add(record)
     db.commit()
@@ -300,7 +300,7 @@ async def record_adjustment(
         description=data.description,
         amount_usd=data.amount_usd,
         created_by_id=admin.id,
-        metadata=data.metadata,
+        extra_data=data.metadata,
     )
     db.add(record)
     db.commit()
@@ -345,7 +345,7 @@ async def get_activity_log(
         "old_value": log.old_value,
         "new_value": log.new_value,
         "ip_address": log.ip_address,
-        "metadata": log.metadata,
+        "metadata": log.extra_data,
         "created_at": log.created_at.isoformat(),
     } for log in logs]
 
@@ -368,7 +368,7 @@ def record_image_cost(
         description=f"Generacion de imagen con {model_used}",
         amount_usd=cost_usd,
         media_id=media_id,
-        metadata={"model_used": model_used},
+        extra_data={"model_used": model_used},
     )
     db.add(record)
     db.commit()

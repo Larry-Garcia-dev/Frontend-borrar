@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     related_entity_type VARCHAR(50),
     related_entity_id UUID,
-    metadata JSONB DEFAULT '{}',
+    extra_data JSONB DEFAULT '{}',
     is_read BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMPTZ,
     email_sent BOOLEAN DEFAULT FALSE,
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS billing_records (
     description VARCHAR(500) NOT NULL,
     amount_usd NUMERIC(10, 4) NOT NULL DEFAULT 0,
     media_id UUID REFERENCES media(id) ON DELETE SET NULL,
-    metadata JSONB DEFAULT '{}',
+    extra_data JSONB DEFAULT '{}',
     created_by_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     new_value JSONB,
     ip_address VARCHAR(45),
     user_agent VARCHAR(500),
-    metadata JSONB DEFAULT '{}',
+    extra_data JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
