@@ -1,30 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Image as ImageIcon,
   Download,
-  Trash2,
   X,
   Calendar,
-  Sparkles,
   Search,
   SlidersHorizontal,
+  Edit3,
+  Flag,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { GeneratedMedia } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 
 export default function GalleryPage() {
-  const { generations, fetchGenerations, deleteGeneration, isLoading } =
-    useGenerationStore();
+  const router = useRouter();
+  const {
+    generations,
+    fetchGenerations,
+    isLoading,
+    startEdit,
+    reportMedia,
+  } = useGenerationStore();
   const [selectedImage, setSelectedImage] = useState<GeneratedMedia | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   useEffect(() => {
     fetchGenerations();
@@ -40,11 +52,39 @@ export default function GalleryPage() {
       return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
     });
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Estas seguro de eliminar esta imagen?")) {
-      await deleteGeneration(id);
-      setSelectedImage(null);
+  const handleEdit = (image: GeneratedMedia) => {
+    startEdit(image.id, image.edit_count);
+    setSelectedImage(null);
+    router.push("/dashboard");
+  };
+
+  const handleOpenReport = () => {
+    setReportReason("");
+    setReportSuccess(false);
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!selectedImage || !reportReason.trim()) return;
+    setIsSubmittingReport(true);
+    try {
+      await reportMedia(selectedImage.id, reportReason.trim());
+      setReportSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+      }, 1500);
+    } catch {
+      // Error handled by store
+    } finally {
+      setIsSubmittingReport(false);
     }
+  };
+
+  const handleDownload = (image: GeneratedMedia) => {
+    const link = document.createElement("a");
+    link.href = image.storage_url;
+    link.download = `macondo-${image.id}.png`;
+    link.click();
   };
 
   return (
@@ -142,8 +182,8 @@ export default function GalleryPage() {
                       <Calendar className="h-4 w-4" />
                       {formatDate(image.created_at)}
                     </div>
-                    <span>
-                      {image.width}x{image.height}
+                    <span className="rounded bg-secondary px-2 py-0.5 text-xs">
+                      {image.edit_count} ediciones
                     </span>
                   </div>
                 </CardContent>
@@ -155,7 +195,7 @@ export default function GalleryPage() {
 
       {/* Image Modal */}
       <AnimatePresence>
-        {selectedImage && (
+        {selectedImage && !showReportModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -178,9 +218,9 @@ export default function GalleryPage() {
                 <X className="h-6 w-6" />
               </button>
 
-                <div className="grid md:grid-cols-2">
+              <div className="grid md:grid-cols-2">
                 {/* Image */}
-                <div className="relative aspect-square">
+                <div className="relative aspect-square bg-black">
                   <img
                     src={selectedImage.storage_url}
                     alt={selectedImage.prompt}
@@ -194,7 +234,7 @@ export default function GalleryPage() {
                     Detalles de la imagen
                   </h3>
 
-                  <div className="space-y-4 flex-1">
+                  <div className="flex-1 space-y-4">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Prompt</p>
                       <p className="mt-1 text-base text-foreground">
@@ -202,28 +242,17 @@ export default function GalleryPage() {
                       </p>
                     </div>
 
-                    {selectedImage.negative_prompt && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">
-                          Prompt negativo
-                        </p>
-                        <p className="mt-1 text-base text-foreground">
-                          {selectedImage.negative_prompt}
-                        </p>
-                      </div>
-                    )}
-
                     <div className="grid grid-cols-2 gap-4">
                       <div className="rounded-lg bg-secondary p-3">
-                        <p className="text-xs text-muted-foreground">Dimensiones</p>
+                        <p className="text-xs text-muted-foreground">Tipo</p>
                         <p className="text-base font-medium text-foreground">
-                          {selectedImage.width} x {selectedImage.height}
+                          {selectedImage.media_type}
                         </p>
                       </div>
                       <div className="rounded-lg bg-secondary p-3">
-                        <p className="text-xs text-muted-foreground">Seed</p>
+                        <p className="text-xs text-muted-foreground">Ediciones</p>
                         <p className="text-base font-medium text-foreground">
-                          {selectedImage.seed}
+                          {selectedImage.edit_count}
                         </p>
                       </div>
                       <div className="col-span-2 rounded-lg bg-secondary p-3">
@@ -236,29 +265,111 @@ export default function GalleryPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-6 flex gap-3">
+                  <div className="mt-6 space-y-3">
                     <Button
                       variant="gradient"
-                      className="flex-1"
-                      onClick={() => {
-                        const link = document.createElement("a");
-                        link.href = selectedImage.storage_url;
-                        link.download = `macondo-${selectedImage.id}.png`;
-                        link.click();
-                      }}
+                      className="w-full"
+                      onClick={() => handleDownload(selectedImage)}
                     >
-                      <Download className="h-5 w-5" />
+                      <Download className="mr-2 h-5 w-5" />
                       Descargar
                     </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleDelete(selectedImage.id)}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="secondary"
+                        className="flex-1"
+                        onClick={() => handleEdit(selectedImage)}
+                      >
+                        <Edit3 className="mr-2 h-4 w-4" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={handleOpenReport}
+                      >
+                        <Flag className="mr-2 h-4 w-4" />
+                        Reportar
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Report Modal */}
+      <AnimatePresence>
+        {showReportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            onClick={() => setShowReportModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl"
+            >
+              {reportSuccess ? (
+                <div className="text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+                    <Check className="h-8 w-8 text-green-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground">
+                    Reporte enviado
+                  </h3>
+                  <p className="mt-2 text-muted-foreground">
+                    Gracias por tu retroalimentacion. Revisaremos tu reporte.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                      <Flag className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-foreground">
+                        Reportar imagen
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Describe el problema con esta imagen
+                      </p>
+                    </div>
+                  </div>
+                  <textarea
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    placeholder="Ej: La imagen no corresponde al prompt, tiene errores visuales, etc."
+                    className="h-32 w-full resize-none rounded-xl border-2 border-input bg-card p-4 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => setShowReportModal(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={handleSubmitReport}
+                      disabled={!reportReason.trim() || isSubmittingReport}
+                      isLoading={isSubmittingReport}
+                    >
+                      Enviar reporte
+                    </Button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
