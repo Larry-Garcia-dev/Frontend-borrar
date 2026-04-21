@@ -172,42 +172,43 @@ export default function DashboardPage() {
   const editIsFree = parentEditCount < 2;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-4 sm:mb-8"
       >
-        <h1 className="text-4xl font-bold text-foreground">Genera tu imagen</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
+        <h1 className="text-2xl sm:text-4xl font-bold text-foreground">Genera tu imagen</h1>
+        <p className="mt-1 sm:mt-2 text-sm sm:text-lg text-muted-foreground">
           Describe lo que quieres crear y deja que la IA haga su magia
         </p>
       </motion.div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="flex flex-col gap-4 sm:gap-8 lg:flex-row lg:gap-8">
         {/* Generation Form */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
+          className="w-full lg:w-1/2"
         >
           <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3 text-2xl">
-                  <Wand2 className="h-6 w-6 text-primary" />
+            <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl">
+                  <Wand2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                   {isEditing ? "Editar imagen" : "Crear imagen"}
                 </CardTitle>
-                <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2">
+                <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-1.5 sm:px-4 sm:py-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">
+                  <span className="text-xs sm:text-sm font-medium">
                     {user?.isUnlimited ? "Ilimitado" : remainingCredits} creditos
                   </span>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
               {/* Edit mode banner */}
               {isEditing && (
                 <div className="flex items-center justify-between rounded-lg bg-primary/10 p-4">
@@ -260,15 +261,15 @@ export default function DashboardPage() {
               )}
 
               {/* Prompt */}
-              <div className="space-y-3">
-                <label className="block text-lg font-semibold text-foreground">
+              <div className="space-y-2 sm:space-y-3">
+                <label className="block text-base sm:text-lg font-semibold text-foreground">
                   Describe tu imagen
                 </label>
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Ej: Un paisaje magico con montanas flotantes y auroras boreales..."
-                  className="h-36 w-full resize-none rounded-xl border-2 border-input bg-card p-4 text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="h-28 sm:h-36 w-full resize-none rounded-xl border-2 border-input bg-card p-3 sm:p-4 text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
@@ -391,13 +392,14 @@ export default function DashboardPage() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
+          className="w-full lg:w-1/2"
         >
           <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-2xl">Resultado</CardTitle>
+            <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+              <CardTitle className="text-lg sm:text-2xl">Resultado</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-secondary/50">
+            <CardContent className="px-4 sm:px-6">
+              <div className="relative aspect-square w-full overflow-hidden rounded-xl sm:rounded-2xl border border-border bg-secondary/50">
                 <AnimatePresence mode="wait">
                   {isGenerating ? (
                     <motion.div
@@ -425,7 +427,6 @@ export default function DashboardPage() {
                         alt={currentGeneration.prompt}
                         className="h-full w-full object-contain"
                         isApproved={isApproved}
-                        watermarkText="PENDIENTE DE APROBACION"
                       />
                     </motion.div>
                   ) : (
@@ -470,18 +471,21 @@ export default function DashboardPage() {
                             Si la imagen no cumple con lo esperado, puedes
                             reportarla o editarla.
                           </p>
-                          <div className="mt-4 flex flex-wrap gap-2">
+                          <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                             <Button
                               variant="default"
                               size="sm"
                               onClick={handleApprove}
+                              className="text-xs sm:text-sm"
                             >
-                              <Check className="mr-2 h-4 w-4" />
-                              Aprobar imagen
+                              <Check className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden xs:inline">Aprobar</span>
+                              <span className="xs:hidden">OK</span>
                             </Button>
                             <Button
                               variant="secondary"
                               size="sm"
+                              className="text-xs sm:text-sm"
                               onClick={() =>
                                 handleStartEdit(
                                   currentGeneration.id,
@@ -489,15 +493,16 @@ export default function DashboardPage() {
                                 )
                               }
                             >
-                              <Edit3 className="mr-2 h-4 w-4" />
+                              <Edit3 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                               Editar
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
+                              className="text-xs sm:text-sm"
                               onClick={() => handleOpenReport(currentGeneration.id)}
                             >
-                              <Flag className="mr-2 h-4 w-4" />
+                              <Flag className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                               Reportar
                             </Button>
                           </div>

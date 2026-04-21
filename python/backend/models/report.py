@@ -56,6 +56,14 @@ class ImageReport(Base):
         default=ReportStatus.PENDING,
     )
     admin_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Mandatory rejection reason/disclaimer when admin rejects
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rejection_disclaimer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Who reviewed the report
+    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -65,3 +73,4 @@ class ImageReport(Base):
 
     media: Mapped["Media"] = relationship()  # type: ignore[name-defined]  # noqa: F821
     user: Mapped["User"] = relationship()  # type: ignore[name-defined]  # noqa: F821
+    reviewed_by: Mapped[Optional["User"]] = relationship(foreign_keys=[reviewed_by_id])  # type: ignore[name-defined]  # noqa: F821
