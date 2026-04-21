@@ -13,6 +13,8 @@ import {
   Edit3,
   Flag,
   Check,
+  AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { GeneratedMedia } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
+import { ProtectedImage } from "@/components/protected-image";
 
 export default function GalleryPage() {
   const router = useRouter();
@@ -37,6 +40,8 @@ export default function GalleryPage() {
   const [reportReason, setReportReason] = useState("");
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+  // Track which images have been approved by the user (by ID)
+  const [approvedImages, setApprovedImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchGenerations();
@@ -80,7 +85,14 @@ export default function GalleryPage() {
     }
   };
 
+  const handleApprove = (imageId: string) => {
+    setApprovedImages((prev) => new Set([...prev, imageId]));
+  };
+
+  const isImageApproved = (imageId: string) => approvedImages.has(imageId);
+
   const handleDownload = (image: GeneratedMedia) => {
+    if (!isImageApproved(image.id)) return;
     const link = document.createElement("a");
     link.href = image.storage_url;
     link.download = `macondo-${image.id}.png`;
@@ -166,11 +178,19 @@ export default function GalleryPage() {
             >
               <Card className="overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10">
                 <div className="relative aspect-square overflow-hidden">
-                  <img
+                  <ProtectedImage
                     src={image.storage_url}
                     alt={image.prompt}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    isApproved={isImageApproved(image.id)}
+                    watermarkText="PROTEGIDO"
                   />
+                  {/* Lock indicator for non-approved images */}
+                  {!isImageApproved(image.id) && (
+                    <div className="absolute right-2 top-2 rounded-full bg-amber-500/90 p-1.5">
+                      <Lock className="h-3 w-3 text-white" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                   <div className="absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
                     <p className="line-clamp-2 text-sm text-white">{image.prompt}</p>
@@ -221,10 +241,12 @@ export default function GalleryPage() {
               <div className="grid md:grid-cols-2">
                 {/* Image */}
                 <div className="relative aspect-square bg-black">
-                  <img
+                  <ProtectedImage
                     src={selectedImage.storage_url}
                     alt={selectedImage.prompt}
                     className="h-full w-full object-contain"
+                    isApproved={isImageApproved(selectedImage.id)}
+                    watermarkText="PENDIENTE DE APROBACION"
                   />
                 </div>
 
@@ -262,36 +284,86 @@ export default function GalleryPage() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Approval notice */}
+                    {!isImageApproved(selectedImage.id) && (
+                      <div className="rounded-xl bg-amber-500/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                          <div>
+                            <p className="font-medium text-foreground">
+                              Imagen protegida
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Debes aprobar la imagen antes de poder descargarla.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
                   <div className="mt-6 space-y-3">
-                    <Button
-                      variant="gradient"
-                      className="w-full"
-                      onClick={() => handleDownload(selectedImage)}
-                    >
-                      <Download className="mr-2 h-5 w-5" />
-                      Descargar
-                    </Button>
-                    <div className="flex gap-3">
-                      <Button
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => handleEdit(selectedImage)}
-                      >
-                        <Edit3 className="mr-2 h-4 w-4" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={handleOpenReport}
-                      >
-                        <Flag className="mr-2 h-4 w-4" />
-                        Reportar
-                      </Button>
-                    </div>
+                    {!isImageApproved(selectedImage.id) ? (
+                      <>
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          onClick={() => handleApprove(selectedImage.id)}
+                        >
+                          <Check className="mr-2 h-5 w-5" />
+                          Aprobar imagen
+                        </Button>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => handleEdit(selectedImage)}
+                          >
+                            <Edit3 className="mr-2 h-4 w-4" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="flex-1"
+                            onClick={handleOpenReport}
+                          >
+                            <Flag className="mr-2 h-4 w-4" />
+                            Reportar
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="gradient"
+                          className="w-full"
+                          onClick={() => handleDownload(selectedImage)}
+                        >
+                          <Download className="mr-2 h-5 w-5" />
+                          Descargar
+                        </Button>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => handleEdit(selectedImage)}
+                          >
+                            <Edit3 className="mr-2 h-4 w-4" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="flex-1"
+                            onClick={handleOpenReport}
+                          >
+                            <Flag className="mr-2 h-4 w-4" />
+                            Reportar
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
