@@ -146,9 +146,9 @@ export default function AdminUsersPage() {
             className="rounded-xl border-2 border-input bg-card px-4 py-3 text-base text-foreground focus:border-primary focus:outline-none"
           >
             <option value="all">Todos los roles</option>
-            <option value="ADMIN">Administradores</option>
-            <option value="VENDOR">Vendors</option>
-            <option value="CREATOR">Creadores</option>
+            <option value="ADMIN">Macondo admin</option>
+            <option value="VENDOR">Estudios</option>
+            <option value="CREATOR">Modelos</option>
           </select>
         </div>
       </motion.div>
