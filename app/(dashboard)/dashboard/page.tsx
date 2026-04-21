@@ -425,7 +425,6 @@ export default function DashboardPage() {
                         alt={currentGeneration.prompt}
                         className="h-full w-full object-contain"
                         isApproved={isApproved}
-                        watermarkText="PENDIENTE DE APROBACION"
                       />
                     </motion.div>
                   ) : (

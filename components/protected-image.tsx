@@ -15,7 +15,7 @@ export function ProtectedImage({
   alt,
   className = "",
   isApproved = false,
-  watermarkText = "PENDIENTE DE APROBACION",
+  watermarkText = "macondo-ia.com",
 }: ProtectedImageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,32 +38,31 @@ export function ProtectedImage({
       // Draw the image
       ctx.drawImage(img, 0, 0);
 
-      // Add watermark overlay
+      // Add single centered watermark
       ctx.save();
-      ctx.globalAlpha = 0.4;
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.restore();
-
-      // Add watermark text diagonally
-      ctx.save();
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${Math.max(canvas.width / 15, 24)}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      // Rotate and draw watermark multiple times
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      ctx.translate(centerX, centerY);
-      ctx.rotate(-Math.PI / 6); // -30 degrees
-
-      for (let y = -canvas.height; y < canvas.height * 2; y += 150) {
-        for (let x = -canvas.width; x < canvas.width * 2; x += 400) {
-          ctx.fillText(watermarkText, x - centerX, y - centerY);
-        }
-      }
+      
+      // Semi-transparent background behind text
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = "#000000";
+      const fontSize = Math.max(canvas.width / 20, 18);
+      const textWidth = ctx.measureText(watermarkText).width || watermarkText.length * fontSize * 0.6;
+      const padding = 20;
+      ctx.fillRect(
+        centerX - textWidth / 2 - padding,
+        centerY - fontSize / 2 - padding / 2,
+        textWidth + padding * 2,
+        fontSize + padding
+      );
+      
+      // Watermark text
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(watermarkText, centerX, centerY);
       ctx.restore();
 
       setIsLoaded(true);

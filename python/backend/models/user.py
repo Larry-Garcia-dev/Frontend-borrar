@@ -7,12 +7,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
-
 
 
 def utcnow() -> datetime:
@@ -21,11 +20,24 @@ def utcnow() -> datetime:
 
 
 class UserRole(str, enum.Enum):
-    """Authorization role for a user."""
-
+    """Authorization role for a user.
+    
+    Hierarchy:
+    - SUPER_ADMIN: Full system access, financial records, all CRUD
+    - ADMIN: Macondo admin, can manage studios and models
+    - ESTUDIO: Studio/Vendor, can request to create models
+    - MODELO: Model/Creator, can generate and manage own photos
+    """
+    SUPER_ADMIN = "SUPER_ADMIN"
     ADMIN = "ADMIN"
-    CREATOR = "CREATOR"
-    VENDOR = "VENDOR"
+    ESTUDIO = "ESTUDIO"  # Previously VENDOR
+    MODELO = "MODELO"    # Previously CREATOR
+
+
+class UserType(str, enum.Enum):
+    """Type of model user for billing/features."""
+    STUDIO_MODEL = "STUDIO_MODEL"      # Model belongs to a studio
+    INDEPENDENT_MODEL = "INDEPENDENT_MODEL"  # Independent model
 
 
 class User(Base):
@@ -39,21 +51,62 @@ class User(Base):
         default=uuid.uuid4,
     )
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    
+    # Authentication
     google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Profile info
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    
+    # Role and type
     role: Mapped[UserRole] = mapped_column(
         String(20),
         nullable=False,
-        default=UserRole.CREATOR,
+        default=UserRole.MODELO,
     )
+    user_type: Mapped[Optional[UserType]] = mapped_column(
+        String(30),
+        nullable=True,
+        default=None,
+    )
+    
+    # Quota management
     daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     used_quota: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_unlimited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     quota_reset_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    
+    # Studio relationship (for MODELO users belonging to a studio)
+    studio_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True, 
+        default=None
+    )
+    
+    # Legacy field - kept for compatibility
     vendor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, default=None
     )
+    
+    # Status flags
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    
+    # Chat extension authorization
+    chat_authorized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    chat_authorized_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    chat_authorized_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, onupdate=utcnow)
 
+    # Relationships
     media: Mapped[List["Media"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -62,3 +115,44 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    
+    # Self-referential relationship for studio -> models
+    models: Mapped[List["User"]] = relationship(
+        "User",
+        backref="studio",
+        remote_side=[id],
+        foreign_keys=[studio_id],
+    )
+    
+    # Notifications
+    notifications: Mapped[List["Notification"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    
+    # Billing records
+    billing_records: Mapped[List["BillingRecord"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="BillingRecord.user_id",
+    )
+    
+    @property
+    def is_admin(self) -> bool:
+        """Check if user has admin privileges."""
+        return self.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    
+    @property
+    def is_super_admin(self) -> bool:
+        """Check if user is super admin."""
+        return self.role == UserRole.SUPER_ADMIN
+    
+    @property
+    def is_studio(self) -> bool:
+        """Check if user is a studio."""
+        return self.role == UserRole.ESTUDIO
+    
+    @property
+    def is_model(self) -> bool:
+        """Check if user is a model."""
+        return self.role == UserRole.MODELO

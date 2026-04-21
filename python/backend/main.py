@@ -10,6 +10,9 @@ from api.endpoints.admin.router import router as admin_router
 from api.endpoints.admin.prompts_router import router as prompts_router
 from api.endpoints.generation.reports_router import router as reports_router
 from api.endpoints.vendor.router import router as vendor_router
+from api.endpoints.notifications.router import router as notifications_router
+from api.endpoints.billing.router import router as billing_router
+from api.endpoints.models.router import router as models_router
 from api.router import api_router
 from core.config import settings
 from core.database import init_db
@@ -36,11 +39,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 app.include_router(prompts_router, prefix="/api/admin", tags=["admin-prompts"])
 app.include_router(reports_router, prefix=f"{settings.API_V1_STR}/generation", tags=["reports"])
 app.include_router(vendor_router, prefix="/api/vendor", tags=["vendor"])
+app.include_router(notifications_router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
+app.include_router(billing_router, prefix=f"{settings.API_V1_STR}/billing", tags=["billing"])
+app.include_router(models_router, prefix=f"{settings.API_V1_STR}/models", tags=["models"])
+
+# Static files for generated media
 app.mount(
     "/media",
     StaticFiles(directory=str((Path(__file__).parent / "media").resolve())),

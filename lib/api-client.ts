@@ -192,6 +192,119 @@ export interface UserMedia {
   model_used?: string;
 }
 
+// Notification types
+export interface Notification {
+  id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  related_entity_type?: string;
+  related_entity_id?: string;
+  metadata?: Record<string, unknown>;
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  notifications: Notification[];
+  total: number;
+  unread_count: number;
+}
+
+// Model profile types
+export interface ModelProfile {
+  id: string;
+  user_id: string;
+  studio_id?: string;
+  display_name: string;
+  bio?: string;
+  age?: number;
+  gender?: string;
+  ethnicity?: string;
+  hair_color?: string;
+  eye_color?: string;
+  height_cm?: number;
+  training_photos: string[];
+  ai_model_id?: string;
+  status: string;
+  rejection_reason?: string;
+  images_per_order: number;
+  created_at: string;
+}
+
+export interface ModelCreationRequest {
+  id: string;
+  studio_id: string;
+  model_email: string;
+  model_name: string;
+  model_phone?: string;
+  training_photos: string[];
+  model_info?: Record<string, unknown>;
+  status: string;
+  payment_required: boolean;
+  payment_amount_usd?: number;
+  payment_completed: boolean;
+  rejection_reason?: string;
+  created_at: string;
+}
+
+export interface CreateModelRequestData {
+  model_email: string;
+  model_name: string;
+  model_phone?: string;
+  model_info?: Record<string, unknown>;
+  training_photos: string[];
+}
+
+// Billing types
+export interface BillingRecord {
+  id: string;
+  record_type: string;
+  description: string;
+  amount_usd: number;
+  media_id?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface UserBalance {
+  user_id: string;
+  balance_usd: number;
+  total_costs_usd: number;
+  total_payments_usd: number;
+  total_images_generated: number;
+  total_ai_trainings: number;
+  last_updated_at: string;
+}
+
+export interface BillingSummary {
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+    role: string;
+  };
+  balance: UserBalance;
+  recent_records: BillingRecord[];
+  period_costs: number;
+  period_payments: number;
+}
+
+// Activity log
+export interface ActivityLog {
+  id: string;
+  user_id?: string;
+  action: string;
+  resource_type?: string;
+  resource_id?: string;
+  old_value?: Record<string, unknown>;
+  new_value?: Record<string, unknown>;
+  ip_address?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
 // Helper para obtener token de cookie
 function getTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null;
@@ -543,6 +656,156 @@ class APIClient {
 
   async deleteVendorUser(userId: string): Promise<void> {
     await this.request(`/users/${userId}`, { method: "DELETE" }, API_PREFIX_VENDOR);
+  }
+}
+
+  // ============================================
+  // Notification endpoints
+  // ============================================
+
+  async getNotifications(unreadOnly = false): Promise<NotificationListResponse> {
+    const query = unreadOnly ? "?unread_only=true" : "";
+    return this.request<NotificationListResponse>(`/notifications/${query}`);
+  }
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    await this.request(`/notifications/${notificationId}/read`, { method: "POST" });
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.request("/notifications/read-all", { method: "POST" });
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    await this.request(`/notifications/${notificationId}`, { method: "DELETE" });
+  }
+
+  // ============================================
+  // Model Profile endpoints
+  // ============================================
+
+  async requestModelCreation(data: CreateModelRequestData): Promise<ModelCreationRequest> {
+    return this.request<ModelCreationRequest>("/models/request-creation", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMyModelRequests(): Promise<ModelCreationRequest[]> {
+    return this.request<ModelCreationRequest[]>("/models/my-requests");
+  }
+
+  async getMyModels(): Promise<ModelProfile[]> {
+    return this.request<ModelProfile[]>("/models/my-models");
+  }
+
+  async getMyProfile(): Promise<ModelProfile> {
+    return this.request<ModelProfile>("/models/my-profile");
+  }
+
+  async updateMyProfile(data: { display_name: string; bio?: string }): Promise<ModelProfile> {
+    return this.request<ModelProfile>("/models/my-profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Admin model endpoints
+  async getPendingModelRequests(): Promise<ModelCreationRequest[]> {
+    return this.request<ModelCreationRequest[]>("/models/pending-requests");
+  }
+
+  async approveModelRequest(requestId: string): Promise<{ message: string; user_id?: string }> {
+    return this.request(`/models/requests/${requestId}/approve`, { method: "POST" });
+  }
+
+  async rejectModelRequest(requestId: string, reason: string): Promise<{ message: string }> {
+    return this.request(`/models/requests/${requestId}/reject?reason=${encodeURIComponent(reason)}`, {
+      method: "POST",
+    });
+  }
+
+  async confirmModelPayment(requestId: string): Promise<{ message: string }> {
+    return this.request(`/models/requests/${requestId}/confirm-payment`, { method: "POST" });
+  }
+
+  async getAllModelProfiles(status?: string): Promise<ModelProfile[]> {
+    const query = status ? `?status=${status}` : "";
+    return this.request<ModelProfile[]>(`/models/all-profiles${query}`);
+  }
+
+  // ============================================
+  // Billing endpoints
+  // ============================================
+
+  async getMyBalance(): Promise<UserBalance> {
+    return this.request<UserBalance>("/billing/my-balance");
+  }
+
+  async getMyBillingRecords(recordType?: string): Promise<BillingRecord[]> {
+    const query = recordType ? `?record_type=${recordType}` : "";
+    return this.request<BillingRecord[]>(`/billing/my-records${query}`);
+  }
+
+  async getUserBillingSummary(userId: string): Promise<BillingSummary> {
+    return this.request<BillingSummary>(`/billing/users/${userId}/summary`);
+  }
+
+  async getAllBalances(): Promise<Array<{ user: { id: string; email: string; name?: string; role: string }; balance: UserBalance }>> {
+    return this.request("/billing/all-balances");
+  }
+
+  async recordPayment(userId: string, amount: number, description: string): Promise<BillingRecord> {
+    return this.request<BillingRecord>("/billing/record-payment", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, amount_usd: amount, description }),
+    });
+  }
+
+  async recordAdjustment(userId: string, amount: number, description: string): Promise<BillingRecord> {
+    return this.request<BillingRecord>("/billing/record-adjustment", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, amount_usd: amount, description }),
+    });
+  }
+
+  async getActivityLog(action?: string, userId?: string): Promise<ActivityLog[]> {
+    const params = new URLSearchParams();
+    if (action) params.set("action", action);
+    if (userId) params.set("user_id", userId);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<ActivityLog[]>(`/billing/activity-log${query}`);
+  }
+
+  // ============================================
+  // File upload for model training photos
+  // ============================================
+
+  async uploadTrainingPhotos(files: File[]): Promise<{ urls: string[] }> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const headers: HeadersInit = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_PREFIX}/models/upload-photos`,
+      {
+        method: "POST",
+        headers,
+        body: formData,
+        credentials: "include",
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || `Error: ${response.status}`);
+    }
+
+    return response.json();
   }
 }
 
