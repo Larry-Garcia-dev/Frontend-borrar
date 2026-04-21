@@ -56,6 +56,20 @@ export interface AuthResponse {
   user: User;
 }
 
+// Respuesta especifica del callback de Google OAuth
+export interface GoogleCallbackResponse {
+  access_token: string;
+  email?: string;
+  user_id?: string;
+  avatar_url?: string;
+  picture?: string;
+  role?: string;
+  daily_limit?: number;
+  used_quota?: number;
+  is_unlimited?: boolean;
+  quota_reset_at?: string;
+}
+
 export interface QuotaUpdate {
   user_id: string;
   quota: number;
@@ -148,9 +162,9 @@ class APIClient {
     window.location.href = `${API_BASE_URL}${API_PREFIX}/auth/google`;
   }
 
-  async handleGoogleCallback(code: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>(
-      `/auth/google/callback?code=${code}`
+  async handleGoogleCallback(code: string): Promise<GoogleCallbackResponse> {
+    const response = await this.request<GoogleCallbackResponse>(
+      `/auth/google/callback?code=${encodeURIComponent(code)}`
     );
     this.setToken(response.access_token);
     return response;
@@ -246,3 +260,4 @@ class APIClient {
 }
 
 export const api = new APIClient();
+export const apiClient = api;
