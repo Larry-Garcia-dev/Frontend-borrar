@@ -114,6 +114,14 @@ async def exchange_google_code(code: str) -> dict:
     Returns a dict with at minimum: sub, email, name, picture.
     """
     import httpx
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Debug: log the redirect URI being used (not secrets)
+    logger.info(f"Google OAuth: Using redirect_uri={settings.GOOGLE_REDIRECT_URI}")
+    logger.info(f"Google OAuth: Client ID configured: {bool(settings.GOOGLE_CLIENT_ID)}")
+    logger.info(f"Google OAuth: Client Secret configured: {bool(settings.GOOGLE_CLIENT_SECRET)}")
 
     async with httpx.AsyncClient(verify=get_httpx_verify()) as client:
         token_resp = await client.post(
@@ -126,6 +134,12 @@ async def exchange_google_code(code: str) -> dict:
                 "grant_type": "authorization_code",
             },
         )
+        
+        # Debug: log response status and body on error
+        if token_resp.status_code != 200:
+            logger.error(f"Google OAuth token exchange failed: {token_resp.status_code}")
+            logger.error(f"Google OAuth error response: {token_resp.text}")
+        
         token_resp.raise_for_status()
         tokens = token_resp.json()
 
