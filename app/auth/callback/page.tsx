@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -12,6 +12,10 @@ export default function AuthCallbackPage() {
   const { handleGoogleCallback } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Autenticando con Google...");
+  
+  // Guard to prevent double execution (React 18 strict mode + dependency changes)
+  const isProcessingRef = useRef(false);
+  const processedCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     const processCallback = async () => {
@@ -22,6 +26,15 @@ export default function AuthCallbackPage() {
         setTimeout(() => router.push("/login"), 3000);
         return;
       }
+
+      // Prevent double execution - codes can only be used once
+      if (isProcessingRef.current || processedCodeRef.current === code) {
+        console.log("[v0] Callback already processing or code already used, skipping...");
+        return;
+      }
+      
+      isProcessingRef.current = true;
+      processedCodeRef.current = code;
 
       try {
         setStatus("Verificando credenciales...");
@@ -43,6 +56,7 @@ export default function AuthCallbackPage() {
         }, 500);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error de autenticacion");
+        isProcessingRef.current = false; // Reset on error to allow retry with new code
         setTimeout(() => router.push("/login"), 3000);
       }
     };
