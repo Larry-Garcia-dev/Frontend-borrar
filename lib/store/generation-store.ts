@@ -28,6 +28,9 @@ interface GenerationState {
   model: string;
   templateId: string | null;
   parentMediaId: string | null;
+  steps: number;
+  guidance: number;
+  seed: number | null;
 
   // Actions
   setPrompt: (prompt: string) => void;
@@ -40,6 +43,9 @@ interface GenerationState {
   setModel: (model: string) => void;
   setTemplateId: (id: string | null) => void;
   setParentMediaId: (id: string | null) => void;
+  setSteps: (steps: number) => void;
+  setGuidance: (guidance: number) => void;
+  setSeed: (seed: number | null) => void;
 
   generate: () => Promise<GeneratedMedia | null>;
   fetchGenerations: () => Promise<void>;
@@ -71,6 +77,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   model: "qwen-image-2.0-pro",
   templateId: null,
   parentMediaId: null,
+  steps: 30,
+  guidance: 7.5,
+  seed: null,
 
   setPrompt: (prompt) => set({ prompt }),
   setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
@@ -82,6 +91,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   setModel: (model) => set({ model }),
   setTemplateId: (id) => set({ templateId: id }),
   setParentMediaId: (id) => set({ parentMediaId: id }),
+  setSteps: (steps) => set({ steps }),
+  setGuidance: (guidance) => set({ guidance }),
+  setSeed: (seed) => set({ seed }),
 
   generate: async () => {
     const state = get();
@@ -214,6 +226,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       model: "qwen-image-2.0-pro",
       templateId: null,
       parentMediaId: null,
+      steps: 30,
+      guidance: 7.5,
+      seed: null,
       currentGeneration: null,
       progress: 0,
       taskStatus: "",

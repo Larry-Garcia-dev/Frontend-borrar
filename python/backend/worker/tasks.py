@@ -460,6 +460,8 @@ def _persist_media(
             insert_values["updated_at"] = created_at
         if "parent_media_id" in media_columns and parent_media_id is not None:
             insert_values["parent_media_id"] = uuid.UUID(str(parent_media_id))
+        if "edit_count" in media_columns:
+            insert_values["edit_count"] = 0
 
         db.execute(media_table.insert().values(**insert_values))
         db.commit()
