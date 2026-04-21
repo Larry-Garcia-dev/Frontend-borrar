@@ -128,6 +128,7 @@ class User(Base):
     notifications: Mapped[List["Notification"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        foreign_keys="Notification.user_id",
     )
     
     # Billing records
