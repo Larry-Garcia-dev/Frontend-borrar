@@ -136,6 +136,7 @@ def _sync_legacy_schema() -> None:
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS model_used VARCHAR(100)"))
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS edit_count INTEGER NOT NULL DEFAULT 0"))
         conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS parent_media_id UUID"))
+        conn.execute(text("ALTER TABLE IF EXISTS media ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT FALSE"))
 
         # Image reports table
         conn.execute(text(

@@ -48,6 +48,7 @@ interface GenerationState {
   startEdit: (mediaId: string, editCount: number) => void;
   cancelEdit: () => void;
   reportMedia: (mediaId: string, reason: string) => Promise<void>;
+  approveMedia: (mediaId: string) => Promise<void>;
 
   generate: () => Promise<GeneratedMedia | null>;
   fetchGenerations: () => Promise<void>;
@@ -211,6 +212,21 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       // Silently fail, templates are optional
     }
   },
+  approveMedia: async (mediaId) => {
+    try {
+      await api.approveMedia(mediaId);
+      set((state) => ({
+        generations: state.generations.map((g) => 
+          g.id === mediaId ? { ...g, is_approved: true } : g
+        ),
+        currentGeneration: state.currentGeneration?.id === mediaId 
+          ? { ...state.currentGeneration, is_approved: true } 
+          : state.currentGeneration
+      }));
+    } catch (error) {
+      console.error("Error al aprobar media:", error);
+    }
+  },
 
   uploadReferenceImages: async (files: File[]) => {
     try {
@@ -250,4 +266,5 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       taskStatus: "",
       taskId: null,
     }),
+    
 }));

@@ -200,6 +200,16 @@ export default function AdminReportsPage() {
                   <Card key={report.id}>
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row justify-between gap-6">
+                        
+                        {/* NUEVO: Imagen reportada */}
+                        <div className="w-32 h-32 rounded-xl overflow-hidden shrink-0 border bg-secondary flex items-center justify-center">
+                          {report.storage_url ? (
+                            <img src={report.storage_url} alt="Reported" className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          )}
+                        </div>
+
                         <div className="space-y-2 flex-1">
                           <h3 className="text-lg font-bold text-destructive flex items-center gap-2">
                             <AlertTriangle className="h-5 w-5" /> Reporte de Calidad
@@ -209,20 +219,40 @@ export default function AdminReportsPage() {
                             <p className="text-sm mt-1">{report.reason}</p>
                           </div>
                           <p className="text-sm text-muted-foreground mt-2">
-                            Media ID: <span className="font-mono">{report.media_id}</span> | Usuario ID: <span className="font-mono">{report.user_id.slice(0,8)}...</span>
+                            Media ID: <span className="font-mono">{report.media_id}</span>
                           </p>
-                          <p className="text-xs text-muted-foreground">{formatDate(report.created_at)}</p>
                         </div>
 
-                        <div className="flex flex-col gap-2 min-w-[200px] justify-center border-l pl-6">
+                        <div className="flex flex-col gap-2 min-w-[200px] justify-center lg:border-l lg:pl-6">
                           <Button variant="outline" className="w-full text-green-500 border-green-500 hover:bg-green-500/10" onClick={() => handleApproveReport(report.id)}>
                             <Check className="h-4 w-4 mr-2" /> Aprobar y Reembolsar
                           </Button>
-                          <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={() => handleRejectReport(report.id)}>
-                            <X className="h-4 w-4 mr-2" /> Ignorar Reporte
+                          <Button variant="destructive" className="w-full" onClick={() => setRejectingId(report.id)}>
+                            <X className="h-4 w-4 mr-2" /> Rechazar Reporte
                           </Button>
                         </div>
                       </div>
+
+                      {/* NUEVO: Formulario de rechazo de reporte */}
+                      <AnimatePresence>
+                        {rejectingId === report.id && (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-6 pt-4 border-t overflow-hidden">
+                            <label className="block text-sm font-medium mb-2 text-destructive">Justificación para rechazar el reporte:</label>
+                            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="w-full p-3 rounded-lg border bg-background mb-3" placeholder="Explica por qué la imagen no tiene problemas..." rows={2} />
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" onClick={() => { setRejectingId(null); setRejectReason(""); }}>Cancelar</Button>
+                              <Button variant="destructive" onClick={async () => {
+                                await rejectReport(report.id, rejectReason);
+                                setRejectingId(null);
+                                setRejectReason("");
+                              }} disabled={!rejectReason.trim()}>
+                                Confirmar Rechazo
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                     </CardContent>
                   </Card>
                 ))

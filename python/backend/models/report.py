@@ -25,6 +25,7 @@ class ReportStatus(str, enum.Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    WITHDRAWN = "WITHDRAWN"
 
 
 class ImageReport(Base):

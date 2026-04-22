@@ -273,25 +273,26 @@ class RejectReportRequest(BaseModel):
 async def list_pending_reports(db: Session = Depends(get_db)):
     """List all image reports with status PENDING."""
     reports = (
-        db.query(ImageReport)
+        db.query(ImageReport, Media.storage_url)
+        .join(Media, ImageReport.media_id == Media.id)
         .filter(ImageReport.status == ReportStatus.PENDING)
         .order_by(ImageReport.created_at.asc())
         .all()
     )
     return [
         {
-            "id": str(r.id),
-            "media_id": str(r.media_id),
-            "user_id": str(r.user_id),
-            "reason": r.reason,
-            "status": r.status.value,
-            "admin_note": r.admin_note,
-            "created_at": r.created_at.isoformat() if r.created_at else "",
-            "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+            "id": str(r.ImageReport.id),
+            "media_id": str(r.ImageReport.media_id),
+            "user_id": str(r.ImageReport.user_id),
+            "storage_url": r.storage_url, # <-- AÑADIDO PARA LA VISTA ADMIN
+            "reason": r.ImageReport.reason,
+            "status": r.ImageReport.status.value,
+            "admin_note": r.ImageReport.admin_note,
+            "created_at": r.ImageReport.created_at.isoformat() if r.ImageReport.created_at else "",
+            "reviewed_at": r.ImageReport.reviewed_at.isoformat() if r.ImageReport.reviewed_at else None,
         }
         for r in reports
     ]
-
 
 @router.post("/reports/{report_id}/approve")
 async def approve_report(report_id: UUID, db: Session = Depends(get_db)):

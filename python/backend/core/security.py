@@ -3,25 +3,26 @@ from typing import Any, Optional
 from urllib.parse import urlencode
 
 import jwt
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
 
 from core.config import get_httpx_verify, settings
 
 # ---------------------------------------------------------------------------
-# Password hashing
+# Password hashing (Usando bcrypt directamente para evitar el bug de passlib)
 # ---------------------------------------------------------------------------
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except (ValueError, TypeError):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -61,9 +62,8 @@ def decode_access_token(token: str) -> dict:
 # FastAPI dependency – current authenticated user
 # ---------------------------------------------------------------------------
 
-
 def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Decode JWT and return the user payload.  Inject DB lookup as needed."""
+    """Decode JWT and return the user payload."""
     payload = decode_access_token(token)
     user_id: Optional[str] = payload.get("sub")
     if user_id is None:
@@ -71,13 +71,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
         )
-    # TODO: fetch User from DB and return the ORM object
     return {"id": user_id}
 
 
 def require_admin(current_user=Depends(get_current_user)):
     """Extend get_current_user to require admin privileges."""
-    # TODO: check current_user.is_admin once DB lookup is wired up
     if not current_user.get("is_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -109,19 +107,11 @@ def google_oauth_url() -> str:
 
 
 async def exchange_google_code(code: str) -> dict:
-    """Exchange an authorization code for Google user info.
-
-    Returns a dict with at minimum: sub, email, name, picture.
-    """
+    """Exchange an authorization code for Google user info."""
     import httpx
     import logging
     
     logger = logging.getLogger(__name__)
-    
-    # Debug: log the redirect URI being used (not secrets)
-    logger.info(f"Google OAuth: Using redirect_uri={settings.GOOGLE_REDIRECT_URI}")
-    logger.info(f"Google OAuth: Client ID configured: {bool(settings.GOOGLE_CLIENT_ID)}")
-    logger.info(f"Google OAuth: Client Secret configured: {bool(settings.GOOGLE_CLIENT_SECRET)}")
 
     async with httpx.AsyncClient(verify=get_httpx_verify()) as client:
         token_resp = await client.post(
@@ -135,7 +125,6 @@ async def exchange_google_code(code: str) -> dict:
             },
         )
         
-        # Debug: log response status and body on error
         if token_resp.status_code != 200:
             logger.error(f"Google OAuth token exchange failed: {token_resp.status_code}")
             logger.error(f"Google OAuth error response: {token_resp.text}")

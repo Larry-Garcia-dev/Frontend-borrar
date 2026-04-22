@@ -65,6 +65,7 @@ export interface GeneratedMedia {
   created_at: string;
   edit_count: number;
   parent_media_id?: string;
+  is_approved: boolean;
 }
 
 // Alias para compatibilidad
@@ -171,6 +172,7 @@ export interface ImageReport {
   admin_note?: string;
   created_at: string;
   reviewed_at?: string;
+  storage_url?: string;
 }
 
 // User cost data
@@ -826,6 +828,12 @@ class APIClient {
     }
 
     return response.json();
+  }
+
+  async approveMedia(mediaId: string): Promise<{ detail: string }> {
+    return this.request<{ detail: string }>(`/generation/${mediaId}/approve`, {
+      method: "POST",
+    });
   }
 }
 

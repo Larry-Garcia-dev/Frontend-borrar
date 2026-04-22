@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useNotificationsStore } from "@/lib/store/notifications-store";
 import { formatDistanceToNow } from "@/lib/utils";
 import { Notification } from "@/lib/api-client";
+import { useRouter } from "next/navigation"; // <- Añadir
 
 const notificationIcons: Record<string, React.ElementType> = {
   REPORT_STATUS: AlertTriangle,
@@ -39,6 +40,7 @@ const notificationColors: Record<string, string> = {
 
 export function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter(); // <- Añadir
   const {
     notifications,
     unreadCount,
@@ -60,9 +62,10 @@ export function NotificationsDropdown() {
     if (!notification.is_read) {
       await markAsRead(notification.id);
     }
-    // Handle navigation based on notification type if needed
-    if (notification.related_entity_type && notification.related_entity_id) {
-      // Could navigate to the related entity
+    // Navegar al panel si es un reporte
+    if (notification.related_entity_type === "REPORT") {
+      router.push("/admin/reports");
+      setIsOpen(false);
     }
   };
 

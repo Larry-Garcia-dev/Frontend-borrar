@@ -133,6 +133,7 @@ async def list_user_media(
             "created_at": m.created_at.isoformat() if m.created_at else "",
             "edit_count": m.edit_count or 0,
             "parent_media_id": str(m.parent_media_id) if m.parent_media_id else None,
+            "is_approved": m.is_approved,
         }
         for m in media_items
     ]
@@ -245,3 +246,33 @@ def _serialize_task_detail(info: Any) -> str:
         if "storage_urls" in info:
             return "Generation completed."
     return str(info)
+
+@router.post("/{media_id}/approve")
+async def approve_media(
+    media_id: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from models.report import ImageReport, ReportStatus
+    import uuid
+    from datetime import datetime, timezone
+    
+    media = db.get(Media, uuid.UUID(media_id))
+    if not media or str(media.user_id) != str(current_user["id"]):
+        raise HTTPException(status_code=404, detail="Media no encontrado")
+    
+    media.is_approved = True
+    
+    # Si había un reporte pendiente, lo marcamos como retirado (WITHDRAWN)
+    pending_report = db.query(ImageReport).filter(
+        ImageReport.media_id == media.id,
+        ImageReport.status == ReportStatus.PENDING
+    ).first()
+    
+    if pending_report:
+        pending_report.status = ReportStatus.WITHDRAWN
+        pending_report.reviewed_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    return {"detail": "Media aprobado correctamente"}
+

@@ -13,6 +13,7 @@ from core.security import (
 )
 from models.user import User, UserRole
 from models.billing import ActivityLog
+from models.model_profile import ModelCreationRequest
 from api.endpoints.auth.schemas import LoginRequest, RegisterRequest
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,8 @@ def format_user_response(user: User, picture: str | None = None) -> dict:
         "used_quota": user.used_quota,
         "is_unlimited": bool(user.is_unlimited),
         "role": user.role.value if hasattr(user.role, "value") else str(user.role),
-        "user_type": user.user_type.value if user.user_type else None,
+        # CORRECCIÓN: Validar si tiene .value o si ya es un string directo
+        "user_type": user.user_type.value if hasattr(user.user_type, "value") else str(user.user_type) if user.user_type else None,
         "quota_reset_at": user.quota_reset_at.isoformat() if user.quota_reset_at else None,
         "is_approved": user.is_approved,
         "studio_id": str(user.studio_id) if user.studio_id else None,
@@ -79,11 +81,24 @@ def register_precreated_account(db: Session, data: RegisterRequest, request: Req
     """Lógica para que un Estudio o Modelo reclame la cuenta que le crearon previamente."""
     # 1. Consulta a la base de datos para hacer match con el correo
     user = db.query(User).filter(User.email == data.email).first()
+    
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Correo no encontrado. Un administrador debe invitarte y crear tu cuenta primero."
-        )
+        # CORRECCIÓN FLUJO: Verificamos si existe en ModelCreationRequest
+        pending_request = db.query(ModelCreationRequest).filter(
+            ModelCreationRequest.model_email == data.email,
+            ModelCreationRequest.status.in_(["PENDING", "PAYMENT_PENDING"])
+        ).first()
+        
+        if pending_request:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu cuenta está actualmente en revisión por un administrador. Te notificaremos cuando sea aprobada."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Correo no encontrado. Un administrador debe crear y aprobar tu solicitud primero."
+            )
     
     # 2. Check de seguridad: Si ya tiene password o google_id, la cuenta ya fue reclamada
     if user.password_hash or user.google_id:

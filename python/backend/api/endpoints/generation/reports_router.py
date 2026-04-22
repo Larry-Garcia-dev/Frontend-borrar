@@ -13,6 +13,9 @@ from core.database import get_db
 from core.security import get_current_user
 from models.media import Media
 from models.report import ImageReport, ReportStatus
+from models.user import User, UserRole
+from models.notification import NotificationType
+from api.endpoints.notifications.router import create_notification
 
 router = APIRouter()
 
@@ -79,6 +82,17 @@ async def create_report(
     db.add(report)
     db.commit()
     db.refresh(report)
+
+    # --- NUEVO: Enviar Notificación al Admin Macondo ---
+    admins = db.query(User).filter(User.role == UserRole.MACONDO_ADMIN).all()
+    for admin in admins:
+        create_notification(
+            db, admin.id, NotificationType.REPORT_STATUS,
+            "Nueva imagen reportada",
+            f"Una modelo ha reportado una imagen generada por problemas de calidad.",
+            related_entity_type="REPORT",
+            related_entity_id=report.id,
+        )
 
     return ReportResponse(
         id=str(report.id),

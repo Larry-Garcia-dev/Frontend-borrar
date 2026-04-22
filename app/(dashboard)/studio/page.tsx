@@ -17,13 +17,19 @@ import { api, ModelCreationRequest, ModelProfile } from "@/lib/api-client";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { formatDate } from "@/lib/utils";
 
+// CORRECCIÓN: Claves actualizadas para coincidir con los strings del Backend
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  PENDING_REVIEW: { icon: Clock, color: "text-amber-500", label: "Pendiente de revision" },
-  PENDING_PAYMENT: { icon: AlertCircle, color: "text-orange-500", label: "Pendiente de pago" },
+  // Estados de ModelCreationRequest (definidos en backend/services.py)
+  PENDING: { icon: Clock, color: "text-amber-500", label: "Pendiente de revisión" },
+  PAYMENT_PENDING: { icon: AlertCircle, color: "text-orange-500", label: "Pendiente de pago" },
+  COMPLETED: { icon: CheckCircle, color: "text-green-500", label: "Completado" },
+  
+  // Estados de ModelProfile (definidos en backend/models/model_profile.py)
   APPROVED: { icon: CheckCircle, color: "text-green-500", label: "Aprobado" },
-  REJECTED: { icon: XCircle, color: "text-red-500", label: "Rechazado" },
   TRAINING: { icon: Clock, color: "text-blue-500", label: "En entrenamiento" },
+  READY: { icon: CheckCircle, color: "text-green-500", label: "Listo para usar" },
   ACTIVE: { icon: CheckCircle, color: "text-green-500", label: "Activo" },
+  REJECTED: { icon: XCircle, color: "text-red-500", label: "Rechazado" },
 };
 
 export default function StudioPage() {
@@ -33,8 +39,8 @@ export default function StudioPage() {
   const [models, setModels] = useState<ModelProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  //const isStudio = user?.role === "STUDIO" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const isStudio = user?.isStudioAdmin || user?.isMacondoAdmin;
+
   useEffect(() => {
     if (isStudio) {
       loadData();
@@ -72,7 +78,7 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -91,9 +97,9 @@ export default function StudioPage() {
         </Button>
       </div>
 
-      {/* Stats */}
+      {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
               <Users className="h-6 w-6 text-primary" />
@@ -104,41 +110,41 @@ export default function StudioPage() {
             </div>
           </div>
         </div>
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
               <Clock className="h-6 w-6 text-amber-500" />
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {requests.filter((r) => r.status === "PENDING_REVIEW").length}
+                {requests.filter((r) => r.status === "PENDING").length}
               </p>
               <p className="text-sm text-muted-foreground">Pendientes</p>
             </div>
           </div>
         </div>
-        <div className="rounded-xl border bg-card p-6">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10">
               <CheckCircle className="h-6 w-6 text-green-500" />
             </div>
             <div>
               <p className="text-2xl font-bold">
-                {requests.filter((r) => r.status === "APPROVED").length}
+                {requests.filter((r) => r.status === "COMPLETED").length}
               </p>
-              <p className="text-sm text-muted-foreground">Aprobados</p>
+              <p className="text-sm text-muted-foreground">Completados</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Active Models */}
+      {/* Active Models Grid */}
       {models.length > 0 && (
         <div>
-          <h2 className="mb-4 text-xl font-semibold">Modelos Activos</h2>
+          <h2 className="mb-4 text-xl font-semibold">Perfiles Activos</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {models.map((model) => {
-              const status = statusConfig[model.status] || statusConfig.PENDING_REVIEW;
+              const status = statusConfig[model.status] || statusConfig.PENDING;
               const StatusIcon = status.icon;
 
               return (
@@ -146,10 +152,10 @@ export default function StudioPage() {
                   key={model.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="group rounded-xl border bg-card p-4 transition-shadow hover:shadow-lg"
+                  className="group rounded-xl border bg-card p-4 transition-all hover:shadow-md"
                 >
                   <div className="flex items-start gap-4">
-                    {model.training_photos.length > 0 && (
+                    {model.training_photos && model.training_photos.length > 0 && (
                       <img
                         src={model.training_photos[0]}
                         alt={model.display_name}
@@ -162,11 +168,10 @@ export default function StudioPage() {
                         <StatusIcon className="h-4 w-4" />
                         <span>{status.label}</span>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {model.images_per_order} imagenes por orden
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Creado el {formatDate(model.created_at)}
                       </p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
                   </div>
                 </motion.div>
               );
@@ -175,21 +180,21 @@ export default function StudioPage() {
         </div>
       )}
 
-      {/* Requests */}
+      {/* Requests Table */}
       {requests.length > 0 && (
         <div>
-          <h2 className="mb-4 text-xl font-semibold">Solicitudes de Creacion</h2>
+          <h2 className="mb-4 text-xl font-semibold">Solicitudes de Creación</h2>
           <div className="space-y-4">
             {requests.map((request) => {
-              const status = statusConfig[request.status] || statusConfig.PENDING_REVIEW;
+              const status = statusConfig[request.status] || statusConfig.PENDING;
               const StatusIcon = status.icon;
 
               return (
                 <motion.div
                   key={request.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl border bg-card p-6"
+                  className="rounded-xl border bg-card p-6 shadow-sm"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
@@ -211,47 +216,6 @@ export default function StudioPage() {
                       </span>
                     </div>
                   </div>
-
-                  {request.status === "REJECTED" && request.rejection_reason && (
-                    <div className="mt-4 rounded-lg bg-destructive/10 p-4">
-                      <p className="text-sm text-destructive">
-                        <strong>Razon del rechazo:</strong> {request.rejection_reason}
-                      </p>
-                    </div>
-                  )}
-
-                  {request.status === "PENDING_PAYMENT" && (
-                    <div className="mt-4 rounded-lg bg-amber-500/10 p-4">
-                      <p className="text-sm text-amber-700">
-                        <strong>Pago requerido:</strong> ${request.payment_amount_usd?.toFixed(2)} USD
-                      </p>
-                      <p className="mt-1 text-xs text-amber-600">
-                        Contacta al administrador para completar el pago.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Training photos preview */}
-                  {request.training_photos.length > 0 && (
-                    <div className="mt-4">
-                      <p className="mb-2 text-sm font-medium">Fotos de entrenamiento ({request.training_photos.length})</p>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {request.training_photos.slice(0, 6).map((photo, index) => (
-                          <img
-                            key={index}
-                            src={photo}
-                            alt={`Training photo ${index + 1}`}
-                            className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
-                          />
-                        ))}
-                        {request.training_photos.length > 6 && (
-                          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-medium">
-                            +{request.training_photos.length - 6}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </motion.div>
               );
             })}
@@ -259,12 +223,12 @@ export default function StudioPage() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty State */}
       {!isLoading && requests.length === 0 && models.length === 0 && (
         <div className="flex min-h-[40vh] items-center justify-center">
           <div className="text-center">
             <Users className="mx-auto h-16 w-16 text-muted-foreground" />
-            <h2 className="mt-4 text-xl font-bold">No tienes modelos aun</h2>
+            <h2 className="mt-4 text-xl font-bold">No tienes modelos aún</h2>
             <p className="mt-2 text-muted-foreground">
               Comienza creando tu primer modelo de IA.
             </p>
@@ -280,15 +244,24 @@ export default function StudioPage() {
         </div>
       )}
 
-      {/* Create model form modal */}
+      {/* Modal Form */}
       {showCreateForm && (
-        <CreateModelForm
-          onClose={() => setShowCreateForm(false)}
-          onSuccess={() => {
-            setShowCreateForm(false);
-            loadData();
-          }}
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border bg-card p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Nueva Solicitud de Modelo</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowCreateForm(false)}>
+                <XCircle className="h-6 w-6" />
+              </Button>
+            </div>
+            <CreateModelForm
+              onSuccess={() => {
+                setShowCreateForm(false);
+                loadData();
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

@@ -7,7 +7,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+# --- CORRECCIÓN: Se agregó 'Boolean' a esta línea de importaciones ---
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,6 +64,9 @@ class Media(Base):
     parent_media_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, default=None
     )
+    
+    # Aprobación de la imagen (nuevo campo)
+    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     user: Mapped["User"] = relationship(back_populates="media")
     tasks: Mapped[List["Task"]] = relationship(back_populates="media")
