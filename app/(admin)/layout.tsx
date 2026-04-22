@@ -33,15 +33,14 @@ export default function AdminLayout({
   const router = useRouter();
   const { user, isAuthenticated, isInitialized } = useAuthStore();
 
-  // Verificar que el usuario sea admin
+  // Validar permisos usando los nuevos roles
   useEffect(() => {
-    if (isInitialized && (!isAuthenticated || !user?.isAdmin)) {
+    if (isInitialized && (!isAuthenticated || !user?.isMacondoAdmin)) {
       router.push("/dashboard");
     }
   }, [isInitialized, isAuthenticated, user, router]);
 
-  // Mostrar loading mientras se verifica
-  if (!isInitialized || !isAuthenticated || !user?.isAdmin) {
+  if (!isInitialized || !isAuthenticated || !user?.isMacondoAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -54,7 +53,6 @@ export default function AdminLayout({
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card">
         <div className="flex h-full flex-col">
-          {/* Logo */}
           <div className="flex h-20 items-center gap-3 border-b border-border px-6">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent">
               <Shield className="h-5 w-5 text-white" />
@@ -65,7 +63,6 @@ export default function AdminLayout({
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 space-y-2 p-4">
             {sidebarLinks.map((link) => {
               const Icon = link.icon;
@@ -89,7 +86,6 @@ export default function AdminLayout({
             })}
           </nav>
 
-          {/* Back link */}
           <div className="border-t border-border p-4">
             <Link href="/dashboard">
               <motion.div
@@ -103,8 +99,6 @@ export default function AdminLayout({
           </div>
         </div>
       </aside>
-
-      {/* Main content */}
       <main className="ml-64 min-h-screen p-8">{children}</main>
     </div>
   );

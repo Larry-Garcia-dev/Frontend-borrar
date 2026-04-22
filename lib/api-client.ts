@@ -68,7 +68,7 @@ export interface GeneratedMedia {
 }
 
 // Alias para compatibilidad
-export interface GeneratedImage extends GeneratedMedia {}
+export interface GeneratedImage extends GeneratedMedia { }
 
 export interface LoginCredentials {
   email: string;
@@ -391,15 +391,36 @@ class APIClient {
   // ============================================
   // Auth endpoints
   // ============================================
+  // ============================================
+  // Auth endpoints
+  // ============================================
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    // Nota: El backend no implementa login con password, solo Google OAuth
-    throw new Error("Login con password no implementado. Usa Google OAuth.");
+    // El backend espera form-data para el login (OAuth2PasswordRequestForm)
+    const formData = new URLSearchParams();
+    formData.append("username", credentials.email);
+    formData.append("password", credentials.password);
+
+    const response = await this.request<AuthResponse>("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formData.toString(),
+    });
+
+    this.setToken(response.access_token);
+    return response;
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    // Nota: El backend no implementa registro con password, solo Google OAuth
-    throw new Error("Registro con password no implementado. Usa Google OAuth.");
+    const response = await this.request<AuthResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+
+    this.setToken(response.access_token);
+    return response;
   }
 
   async loginWithGoogle(): Promise<void> {
@@ -491,7 +512,7 @@ class APIClient {
 
     while (attempts < maxAttempts) {
       const status = await this.getTaskStatus(taskId);
-      
+
       if (onProgress) {
         onProgress(status.status, status.detail);
       }

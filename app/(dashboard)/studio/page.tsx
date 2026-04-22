@@ -33,8 +33,8 @@ export default function StudioPage() {
   const [models, setModels] = useState<ModelProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isStudio = user?.role === "STUDIO" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
-
+  //const isStudio = user?.role === "STUDIO" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isStudio = user?.isStudioAdmin || user?.isMacondoAdmin;
   useEffect(() => {
     if (isStudio) {
       loadData();

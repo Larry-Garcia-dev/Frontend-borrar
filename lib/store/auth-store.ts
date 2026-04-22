@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, MeResponse, GoogleCallbackResponse } from "@/lib/api-client";
+import { api, MeResponse, GoogleCallbackResponse, LoginCredentials, RegisterData } from "@/lib/api-client";
 
 // User type for frontend state
 export interface AuthUser {
@@ -10,6 +10,9 @@ export interface AuthUser {
   role: string;
   isAdmin: boolean;
   isVendor: boolean;
+  isMacondoAdmin: boolean;
+  isStudioAdmin: boolean;
+  maxModelsLimit: number;
   dailyLimit: number;
   usedQuota: number;
   isUnlimited: boolean;
@@ -24,7 +27,9 @@ interface AuthState {
   isAuthenticated: boolean;
   error: string | null;
 
-  // Actions
+  // Acciones actualizadas
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   loginWithGoogle: () => void;
   handleGoogleCallback: (code: string) => Promise<AuthUser>;
   logout: () => void;
@@ -36,32 +41,19 @@ interface AuthState {
   initializeFromCookie: () => Promise<void>;
 }
 
-// Helper para parsear respuesta de /auth/me a AuthUser
-function parseUserFromMe(data: MeResponse): AuthUser {
-  const role = (data.role || "CREATOR").toUpperCase();
+function parseUserFromMe(data: MeResponse | any): AuthUser {
+  const role = (data.role || "MODELO").toUpperCase();
   return {
     id: data.user_id,
     email: data.email,
+    name: data.name,
+    avatar: data.picture || data.avatar_url || "",
     role: role,
-    isAdmin: role === "ADMIN",
-    isVendor: role === "VENDOR",
-    dailyLimit: data.daily_limit ?? 10,
-    usedQuota: data.used_quota ?? 0,
-    isUnlimited: data.is_unlimited ?? false,
-    quotaResetAt: data.quota_reset_at || "",
-  };
-}
-
-// Helper para parsear respuesta de Google callback a AuthUser
-function parseUserFromCallback(data: GoogleCallbackResponse): AuthUser {
-  const role = (data.role || "CREATOR").toUpperCase();
-  return {
-    id: data.user_id || "",
-    email: data.email || "",
-    avatar: data.avatar_url || data.picture || "",
-    role: role,
-    isAdmin: role === "ADMIN",
-    isVendor: role === "VENDOR",
+    isAdmin: role === "MACONDO_ADMIN",
+    isVendor: role === "ESTUDIO_ADMIN",
+    isMacondoAdmin: role === "MACONDO_ADMIN",
+    isStudioAdmin: role === "ESTUDIO_ADMIN",
+    maxModelsLimit: data.max_models_limit || 5,
     dailyLimit: data.daily_limit ?? 10,
     usedQuota: data.used_quota ?? 0,
     isUnlimited: data.is_unlimited ?? false,
@@ -77,6 +69,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   error: null,
 
+  // --- NUEVAS FUNCIONES DE LOGIN Y REGISTRO ---
+  login: async (credentials: LoginCredentials) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.login(credentials);
+      const authUser = parseUserFromMe(response);
+      set({
+        user: authUser,
+        token: response.access_token,
+        isAuthenticated: true,
+        isLoading: false,
+        isInitialized: true,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al iniciar sesión",
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  register: async (data: RegisterData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.register(data);
+      const authUser = parseUserFromMe(response);
+      set({
+        user: authUser,
+        token: response.access_token,
+        isAuthenticated: true,
+        isLoading: false,
+        isInitialized: true,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al registrarse",
+        isLoading: false,
+      });
+      throw error; // Lanzamos el error para que la interfaz sepa que falló
+    }
+  },
+  // --------------------------------------------
+
   setUser: (user) => {
     set({ user, isAuthenticated: true });
   },
@@ -87,7 +123,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initializeFromCookie: async () => {
-    // Evitar inicializar multiples veces
     if (get().isInitialized) return;
 
     const token = api.getToken();
@@ -108,7 +143,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isInitialized: true,
       });
     } catch {
-      // Token invalido o expirado
       api.setToken(null);
       set({
         user: null,
@@ -135,8 +169,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return authUser;
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : "Error al iniciar sesion",
+        error: error instanceof Error ? error.message : "Error al iniciar sesion",
         isLoading: false,
       });
       throw error;
@@ -155,7 +188,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       error: null,
     });
-    // Redirigir a login
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
@@ -187,6 +219,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userData = await api.getCurrentUser();
       const currentUser = get().user;
       if (currentUser) {
+        const role = (userData.role || "MODELO").toUpperCase();
         set({
           user: {
             ...currentUser,
@@ -194,9 +227,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             usedQuota: userData.used_quota ?? currentUser.usedQuota,
             isUnlimited: userData.is_unlimited ?? currentUser.isUnlimited,
             quotaResetAt: userData.quota_reset_at || currentUser.quotaResetAt,
-            role: userData.role || currentUser.role,
-            isAdmin: (userData.role || "").toUpperCase() === "ADMIN",
-            isVendor: (userData.role || "").toUpperCase() === "VENDOR",
+            role: role,
+            isAdmin: role === "MACONDO_ADMIN",
+            isVendor: role === "ESTUDIO_ADMIN",
+            isMacondoAdmin: role === "MACONDO_ADMIN",
+            isStudioAdmin: role === "ESTUDIO_ADMIN",
           },
         });
       }

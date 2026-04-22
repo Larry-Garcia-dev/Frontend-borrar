@@ -24,16 +24,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAdminStore } from "@/lib/store/admin-store";
 import { formatDate, cn } from "@/lib/utils";
 
+// ACTUALIZACIÓN DE ROLES
 const roleColors: Record<string, string> = {
-  ADMIN: "bg-purple-500/10 text-purple-500 border-purple-500/30",
-  VENDOR: "bg-blue-500/10 text-blue-500 border-blue-500/30",
-  CREATOR: "bg-green-500/10 text-green-500 border-green-500/30",
+  MACONDO_ADMIN: "bg-purple-500/10 text-purple-500 border-purple-500/30",
+  ESTUDIO_ADMIN: "bg-blue-500/10 text-blue-500 border-blue-500/30",
+  MODELO: "bg-green-500/10 text-green-500 border-green-500/30",
 };
 
 const roleIcons: Record<string, typeof Shield> = {
-  ADMIN: Shield,
-  VENDOR: Store,
-  CREATOR: UserIcon,
+  MACONDO_ADMIN: Shield,
+  ESTUDIO_ADMIN: Store,
+  MODELO: UserIcon,
 };
 
 export default function AdminUsersPage() {
@@ -44,8 +45,8 @@ export default function AdminUsersPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [editData, setEditData] = useState({ daily_limit: 0, role: "", is_unlimited: false });
-  const [newUserData, setNewUserData] = useState({ email: "", role: "CREATOR", daily_limit: 10, is_unlimited: false });
+  const [editData, setEditData] = useState({ daily_limit: 0, role: "", is_unlimited: false, max_models_limit: 5 });
+  const [newUserData, setNewUserData] = useState({ email: "", role: "MODELO", daily_limit: 10, is_unlimited: false, max_models_limit: 5 });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function AdminUsersPage() {
         daily_limit: user.daily_limit,
         role: user.role,
         is_unlimited: user.is_unlimited,
+        max_models_limit: user.max_models_limit || 5,
       });
       setShowEditModal(true);
     }
@@ -93,7 +95,7 @@ export default function AdminUsersPage() {
   const handleCreateUser = async () => {
     await createUser(newUserData);
     setShowCreateModal(false);
-    setNewUserData({ email: "", role: "CREATOR", daily_limit: 10, is_unlimited: false });
+    setNewUserData({ email: "", role: "MODELO", daily_limit: 10, is_unlimited: false, max_models_limit: 5 });
   };
 
   return (
@@ -146,9 +148,9 @@ export default function AdminUsersPage() {
             className="rounded-xl border-2 border-input bg-card px-4 py-3 text-base text-foreground focus:border-primary focus:outline-none"
           >
             <option value="all">Todos los roles</option>
-            <option value="ADMIN">Macondo admin</option>
-            <option value="VENDOR">Estudios</option>
-            <option value="CREATOR">Modelos</option>
+            <option value="MACONDO_ADMIN">Macondo Admins</option>
+            <option value="ESTUDIO_ADMIN">Estudios</option>
+            <option value="MODELO">Modelos</option>
           </select>
         </div>
       </motion.div>
@@ -177,7 +179,7 @@ export default function AdminUsersPage() {
                         Rol
                       </th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
-                        Cuota
+                        Cuota de Fotos
                       </th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-muted-foreground">
                         Estado
@@ -221,12 +223,17 @@ export default function AdminUsersPage() {
                             <span
                               className={cn(
                                 "inline-flex items-center gap-2 rounded-lg border px-3 py-1 text-sm font-medium",
-                                roleColors[role] || roleColors.CREATOR
+                                roleColors[role] || roleColors.MODELO
                               )}
                             >
                               <RoleIcon className="h-4 w-4" />
-                              {role}
+                              {role.replace("_", " ")}
                             </span>
+                            {role === "ESTUDIO_ADMIN" && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Modelos max: {user.max_models_limit}
+                              </p>
+                            )}
                           </td>
                           <td className="px-6 py-4">
                             {user.is_unlimited ? (
@@ -250,8 +257,8 @@ export default function AdminUsersPage() {
                                       quotaPercent > 90
                                         ? "bg-destructive"
                                         : quotaPercent > 70
-                                        ? "bg-yellow-500"
-                                        : "bg-green-500"
+                                          ? "bg-yellow-500"
+                                          : "bg-green-500"
                                     )}
                                     style={{
                                       width: `${Math.min(quotaPercent, 100)}%`,
@@ -352,14 +359,34 @@ export default function AdminUsersPage() {
                     }
                     className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
                   >
-                    <option value="CREATOR">Creador</option>
-                    <option value="VENDOR">Vendor</option>
-                    <option value="ADMIN">Administrador</option>
+                    <option value="MODELO">Modelo</option>
+                    <option value="ESTUDIO_ADMIN">Estudio Admin</option>
+                    <option value="MACONDO_ADMIN">Macondo Admin</option>
                   </select>
                 </div>
+
+                {editData.role === "ESTUDIO_ADMIN" && (
+                  <div>
+                    <label className="block text-base font-medium text-foreground">
+                      Límite de Modelos
+                    </label>
+                    <input
+                      type="number"
+                      value={editData.max_models_limit}
+                      onChange={(e) =>
+                        setEditData({
+                          ...editData,
+                          max_models_limit: Number(e.target.value),
+                        })
+                      }
+                      className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-base font-medium text-foreground">
-                    Cuota Diaria
+                    Cuota Diaria de Fotos
                   </label>
                   <input
                     type="number"
@@ -450,14 +477,34 @@ export default function AdminUsersPage() {
                     }
                     className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
                   >
-                    <option value="CREATOR">Creador</option>
-                    <option value="VENDOR">Vendor</option>
-                    <option value="ADMIN">Administrador</option>
+                    <option value="MODELO">Modelo</option>
+                    <option value="ESTUDIO_ADMIN">Estudio Admin</option>
+                    <option value="MACONDO_ADMIN">Macondo Admin</option>
                   </select>
                 </div>
+
+                {newUserData.role === "ESTUDIO_ADMIN" && (
+                  <div>
+                    <label className="block text-base font-medium text-foreground">
+                      Límite de Modelos
+                    </label>
+                    <input
+                      type="number"
+                      value={newUserData.max_models_limit}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          max_models_limit: Number(e.target.value),
+                        })
+                      }
+                      className="mt-2 w-full rounded-xl border-2 border-input bg-background px-4 py-3 text-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-base font-medium text-foreground">
-                    Cuota Diaria
+                    Cuota Diaria de Fotos
                   </label>
                   <input
                     type="number"

@@ -28,15 +28,13 @@ export default function VendorLayout({
   const router = useRouter();
   const { user, isAuthenticated, isInitialized } = useAuthStore();
 
-  // Verificar que el usuario sea vendor
   useEffect(() => {
-    if (isInitialized && (!isAuthenticated || !user?.isVendor)) {
+    if (isInitialized && (!isAuthenticated || !user?.isStudioAdmin)) {
       router.push("/dashboard");
     }
   }, [isInitialized, isAuthenticated, user, router]);
 
-  // Mostrar loading mientras se verifica
-  if (!isInitialized || !isAuthenticated || !user?.isVendor) {
+  if (!isInitialized || !isAuthenticated || !user?.isStudioAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -46,21 +44,18 @@ export default function VendorLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card">
         <div className="flex h-full flex-col">
-          {/* Logo */}
           <div className="flex h-20 items-center gap-3 border-b border-border px-6">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600">
               <Store className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-lg font-bold text-foreground">Vendor Panel</p>
+              <p className="text-lg font-bold text-foreground">Panel de Estudio</p>
               <p className="text-xs text-muted-foreground">Macondo AI</p>
             </div>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 space-y-2 p-4">
             {sidebarLinks.map((link) => {
               const Icon = link.icon;
@@ -84,7 +79,6 @@ export default function VendorLayout({
             })}
           </nav>
 
-          {/* Back link */}
           <div className="border-t border-border p-4">
             <Link href="/dashboard">
               <motion.div
@@ -98,8 +92,6 @@ export default function VendorLayout({
           </div>
         </div>
       </aside>
-
-      {/* Main content */}
       <main className="ml-64 min-h-screen p-8">{children}</main>
     </div>
   );
