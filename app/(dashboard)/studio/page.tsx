@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Users,
@@ -9,27 +9,35 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  ChevronRight,
+  Edit,
+  Power,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CreateModelForm } from "@/components/studio/create-model-form";
 import { api, ModelCreationRequest, ModelProfile } from "@/lib/api-client";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-// CORRECCIÓN: Claves actualizadas para coincidir con los strings del Backend
-const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  // Estados de ModelCreationRequest (definidos en backend/services.py)
+// 1. Configuración de estados para las SOLICITUDES (Requests)
+const requestStatusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   PENDING: { icon: Clock, color: "text-amber-500", label: "Pendiente de revisión" },
   PAYMENT_PENDING: { icon: AlertCircle, color: "text-orange-500", label: "Pendiente de pago" },
   COMPLETED: { icon: CheckCircle, color: "text-green-500", label: "Completado" },
-  
-  // Estados de ModelProfile (definidos en backend/models/model_profile.py)
+  REJECTED: { icon: XCircle, color: "text-red-500", label: "Rechazado" },
+};
+
+// 2. Configuración de estados para los PERFILES DE MODELO (Profiles)
+const profileStatusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+  PENDING: { icon: Clock, color: "text-blue-500", label: "Pendiente de Entrenamiento" },
   APPROVED: { icon: CheckCircle, color: "text-green-500", label: "Aprobado" },
   TRAINING: { icon: Clock, color: "text-blue-500", label: "En entrenamiento" },
   READY: { icon: CheckCircle, color: "text-green-500", label: "Listo para usar" },
   ACTIVE: { icon: CheckCircle, color: "text-green-500", label: "Activo" },
   REJECTED: { icon: XCircle, color: "text-red-500", label: "Rechazado" },
+  SUSPENDED: { icon: AlertCircle, color: "text-red-500", label: "Suspendido" },
 };
 
 export default function StudioPage() {
@@ -38,6 +46,11 @@ export default function StudioPage() {
   const [requests, setRequests] = useState<ModelCreationRequest[]>([]);
   const [models, setModels] = useState<ModelProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Estados para el Modal de Edición de Cuota
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelProfile | null>(null);
+  const [newQuota, setNewQuota] = useState<number>(0);
 
   const isStudio = user?.isStudioAdmin || user?.isMacondoAdmin;
 
@@ -63,6 +76,44 @@ export default function StudioPage() {
     }
   };
 
+  // --- Acciones de Gestión de Modelos ---
+
+  const handleEditClick = (model: ModelProfile) => {
+    setSelectedModel(model);
+    setNewQuota(model.images_per_order);
+    setShowEditModal(true);
+  };
+
+  const handleSaveQuota = async () => {
+    if (!selectedModel) return;
+    try {
+      // Actualizamos la cuota del usuario usando el API de Vendor
+      await api.updateVendorUser(selectedModel.user_id, { daily_limit: newQuota });
+      toast.success("Cuota actualizada correctamente");
+      setShowEditModal(false);
+      loadData(); // Recargamos los datos para reflejar los cambios
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar la cuota");
+    }
+  };
+
+  const handleToggleStatus = async (modelId: string, currentStatus: string) => {
+    toast.info("Función para pausar/activar en desarrollo");
+    // Aquí iría la llamada al endpoint para alternar el status entre ACTIVE y SUSPENDED
+  };
+
+  const handleDeleteModel = async (userId: string) => {
+    if (confirm("¿Estás seguro de que deseas eliminar este modelo? Esta acción no se puede deshacer y liberará los créditos de tu estudio.")) {
+      try {
+        await api.deleteVendorUser(userId);
+        toast.success("Modelo eliminado exitosamente");
+        loadData();
+      } catch (error: any) {
+        toast.error(error.message || "Error al eliminar el modelo");
+      }
+    }
+  };
+
   if (!isStudio) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -84,7 +135,7 @@ export default function StudioPage() {
         <div>
           <h1 className="text-3xl font-bold">Mis Modelos</h1>
           <p className="text-muted-foreground">
-            Gestiona los modelos de tu estudio
+            Gestiona los perfiles y cuotas de tu estudio
           </p>
         </div>
         <Button
@@ -142,9 +193,9 @@ export default function StudioPage() {
       {models.length > 0 && (
         <div>
           <h2 className="mb-4 text-xl font-semibold">Perfiles Activos</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {models.map((model) => {
-              const status = statusConfig[model.status] || statusConfig.PENDING;
+              const status = profileStatusConfig[model.status] || profileStatusConfig.PENDING;
               const StatusIcon = status.icon;
 
               return (
@@ -152,25 +203,69 @@ export default function StudioPage() {
                   key={model.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="group rounded-xl border bg-card p-4 transition-all hover:shadow-md"
+                  className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col"
                 >
-                  <div className="flex items-start gap-4">
-                    {model.training_photos && model.training_photos.length > 0 && (
+                  {/* Info Superior */}
+                  <div className="flex p-4 gap-4 border-b border-border/50">
+                    {model.training_photos && model.training_photos.length > 0 ? (
                       <img
                         src={model.training_photos[0]}
                         alt={model.display_name}
-                        className="h-16 w-16 rounded-lg object-cover"
+                        className="h-20 w-20 rounded-lg object-cover border"
                       />
+                    ) : (
+                      <div className="h-20 w-20 rounded-lg bg-secondary flex items-center justify-center">
+                        <Users className="h-8 w-8 text-muted-foreground" />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate">{model.display_name}</h3>
-                      <div className={`flex items-center gap-1 text-sm ${status.color}`}>
+                      <h3 className="font-bold text-lg truncate">{model.display_name}</h3>
+                      <div className={`flex items-center gap-1 text-sm font-medium mt-1 ${status.color}`}>
                         <StatusIcon className="h-4 w-4" />
                         <span>{status.label}</span>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         Creado el {formatDate(model.created_at)}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Panel de Control (Inferior) */}
+                  <div className="p-4 bg-secondary/30 space-y-4 flex-1 flex flex-col justify-end">
+                    <div className="flex justify-between items-center text-sm bg-background/50 p-2 rounded-lg border">
+                      <span className="text-muted-foreground">Cuota asignada:</span>
+                      <span className="font-bold">{model.images_per_order} fotos/día</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full flex gap-2"
+                        title="Editar Cuota"
+                        onClick={() => handleEditClick(model)}
+                      >
+                        <Edit className="h-4 w-4" /> <span className="hidden xs:inline">Cuota</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full flex gap-2"
+                        title={model.status === "ACTIVE" ? "Pausar Modelo" : "Activar Modelo"}
+                        onClick={() => handleToggleStatus(model.id, model.status)}
+                      >
+                        <Power className={cn("h-4 w-4", model.status === "ACTIVE" ? "text-green-500" : "text-amber-500")} />
+                        <span className="hidden xs:inline">{model.status === "ACTIVE" ? "Pausar" : "Activar"}</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full flex gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                        title="Eliminar"
+                        onClick={() => handleDeleteModel(model.user_id)}
+                      >
+                        <Trash2 className="h-4 w-4" /> <span className="hidden xs:inline">Borrar</span>
+                      </Button>
                     </div>
                   </div>
                 </motion.div>
@@ -186,7 +281,7 @@ export default function StudioPage() {
           <h2 className="mb-4 text-xl font-semibold">Solicitudes de Creación</h2>
           <div className="space-y-4">
             {requests.map((request) => {
-              const status = statusConfig[request.status] || statusConfig.PENDING;
+              const status = requestStatusConfig[request.status] || requestStatusConfig.PENDING;
               const StatusIcon = status.icon;
 
               return (
@@ -244,25 +339,67 @@ export default function StudioPage() {
         </div>
       )}
 
-      {/* Modal Form */}
-      {showCreateForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border bg-card p-6 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Nueva Solicitud de Modelo</h2>
-              <Button variant="ghost" size="icon" onClick={() => setShowCreateForm(false)}>
-                <XCircle className="h-6 w-6" />
-              </Button>
+      {/* Modal: Create Model Form */}
+      <AnimatePresence>
+        {showCreateForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border bg-card p-6 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Nueva Solicitud de Modelo</h2>
+                <Button variant="ghost" size="icon" onClick={() => setShowCreateForm(false)}>
+                  <XCircle className="h-6 w-6" />
+                </Button>
+              </div>
+              <CreateModelForm
+                onSuccess={() => {
+                  setShowCreateForm(false);
+                  loadData();
+                }}
+              />
             </div>
-            <CreateModelForm
-              onSuccess={() => {
-                setShowCreateForm(false);
-                loadData();
-              }}
-            />
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Editar Cuota */}
+      <AnimatePresence>
+        {showEditModal && selectedModel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }} 
+              className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-xl"
+            >
+              <h3 className="text-xl font-bold mb-2">Editar Cuota de Fotos</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Modifica el límite diario de fotos para <span className="font-bold text-foreground">{selectedModel.display_name}</span>.
+              </p>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Límite Diario</label>
+                  <Input 
+                    type="number" 
+                    min={1}
+                    value={newQuota}
+                    onChange={(e) => setNewQuota(Number(e.target.value))}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Límite global disponible: {user?.dailyLimit}
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancelar</Button>
+                  <Button variant="gradient" onClick={handleSaveQuota}>Guardar Cambios</Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

@@ -196,7 +196,9 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
         studio_id=request.studio_id,
         display_name=request.model_name,
         training_photos=request.training_photos,
-        status=ModelProfileStatus.PENDING,
+        # --- CAMBIO CLAVE: Cambiamos PENDING por APPROVED ---
+        status=ModelProfileStatus.APPROVED,
+        # ----------------------------------------------------
     )
     if request.model_info:
         profile.age = request.model_info.get("age")
