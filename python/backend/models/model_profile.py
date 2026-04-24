@@ -25,6 +25,7 @@ class ModelProfileStatus(str, enum.Enum):
     APPROVED = "APPROVED"         # Approved and ready for AI training
     TRAINING = "TRAINING"         # AI is being trained
     READY = "READY"               # AI trained and ready to use
+    ACTIVE = "ACTIVE"             # <--- ESTADO AÑADIDO: Modelo activa y generando
     REJECTED = "REJECTED"         # Rejected by admin
     SUSPENDED = "SUSPENDED"       # Temporarily suspended
 

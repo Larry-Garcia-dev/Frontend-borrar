@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 
 from models.model_profile import ModelProfile, ModelProfileStatus, ModelCreationRequest
 from models.user import User, UserRole, UserType
@@ -57,22 +58,37 @@ def format_request_response(req: ModelCreationRequest) -> ModelCreationRequestRe
 # --- Lógica de Negocio ---
 def create_model_request(db: Session, current_user_id: str, data: CreateModelRequest):
     user = db.get(User, uuid.UUID(current_user_id))
-    
     if not user or user.role not in [UserRole.ESTUDIO_ADMIN, UserRole.MACONDO_ADMIN]:
-        raise HTTPException(status_code=403, detail="Solo estudios o administradores pueden crear perfiles de modelos")
+        raise HTTPException(status_code=403, detail="Solo estudios o administradores")
     
     existing = db.query(User).filter(User.email == data.model_email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Este email ya está registrado")
     
-    existing_request = db.query(ModelCreationRequest).filter(
-        ModelCreationRequest.studio_id == user.id,
-        ModelCreationRequest.model_email == data.model_email,
-        ModelCreationRequest.status.in_(["PENDING", "PAYMENT_PENDING"])
-    ).first()
+    # 1. VALIDACIÓN ESTRICTA DE CRÉDITOS
+    assigned_limit = int(data.model_info.get("assigned_daily_limit", 10)) if data.model_info else 10
     
-    if existing_request:
-        raise HTTPException(status_code=400, detail="Ya existe una solicitud pendiente para este email")
+    current_models_sum = db.execute(
+        select(func.sum(User.daily_limit)).where(User.studio_id == user.id)
+    ).scalar() or 0
+    
+    pending_requests = db.query(ModelCreationRequest).filter(
+        ModelCreationRequest.studio_id == user.id,
+        ModelCreationRequest.status.in_(["PENDING", "PAYMENT_PENDING"])
+    ).all()
+    
+    pending_sum = 0
+    for r in pending_requests:
+        val = r.model_info.get("assigned_daily_limit", 10) if isinstance(r.model_info, dict) else 10
+        pending_sum += int(val)
+        
+    total_requested = current_models_sum + pending_sum + assigned_limit
+    if total_requested > user.daily_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Créditos insuficientes. Límite de estudio: {user.daily_limit}. En uso/pendiente: {current_models_sum + pending_sum}. Intentas asignar: {assigned_limit}."
+        )
+    # FIN VALIDACIÓN
     
     request = ModelCreationRequest(
         studio_id=user.id,
@@ -158,7 +174,6 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
     request = db.get(ModelCreationRequest, uuid.UUID(request_id))
     if not request:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
-    
     if request.status not in ("PENDING", "PAYMENT_PENDING"):
         raise HTTPException(status_code=400, detail="Esta solicitud ya fue procesada")
     
@@ -175,7 +190,9 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
         )
         return {"message": "Solicitud aprobada. Pendiente de pago.", "status": "PAYMENT_PENDING"}
     
-    # IMPORTANTE: password_hash es None
+    # 2. AL APROBAR, EXTRAEMOS LOS CRÉDITOS ASIGNADOS
+    assigned_limit = int(request.model_info.get("assigned_daily_limit", 10)) if isinstance(request.model_info, dict) else 10
+    
     model_user = User(
         email=request.model_email,
         name=request.model_name,
@@ -184,6 +201,7 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
         role=UserRole.MODELO,
         user_type=UserType.STUDIO_MODEL,
         studio_id=request.studio_id,
+        daily_limit=assigned_limit,  # <-- Se asignan al User
         is_approved=True,
         approved_at=datetime.now(timezone.utc),
         approved_by_id=admin.id,
@@ -196,9 +214,8 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
         studio_id=request.studio_id,
         display_name=request.model_name,
         training_photos=request.training_photos,
-        # --- CAMBIO CLAVE: Cambiamos PENDING por APPROVED ---
+        images_per_order=assigned_limit, # <-- Se asignan al Perfil
         status=ModelProfileStatus.APPROVED,
-        # ----------------------------------------------------
     )
     if request.model_info:
         profile.age = request.model_info.get("age")
@@ -292,3 +309,24 @@ def get_all_model_profiles(db: Session, admin_id: str, skip: int, limit: int, st
     
     profiles = query.order_by(ModelProfile.created_at.desc()).offset(skip).limit(limit).all()
     return [format_profile_response(p) for p in profiles]
+
+def toggle_model_status_service(db: Session, studio_id: str, profile_id: str):
+    """Pausa o Activa una modelo (Congelar)."""
+    profile = db.get(ModelProfile, uuid.UUID(profile_id))
+    if not profile or str(profile.studio_id) != studio_id:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    
+    if profile.status in [ModelProfileStatus.ACTIVE, ModelProfileStatus.APPROVED, ModelProfileStatus.READY]:
+        profile.status = ModelProfileStatus.SUSPENDED
+    elif profile.status == ModelProfileStatus.SUSPENDED:
+        profile.status = ModelProfileStatus.ACTIVE
+    else:
+        raise HTTPException(status_code=400, detail=f"No se puede cambiar el estado actual ({profile.status.value})")
+        
+    user = db.get(User, profile.user_id)
+    if user:
+        user.is_active = profile.status in [ModelProfileStatus.ACTIVE, ModelProfileStatus.APPROVED, ModelProfileStatus.READY]
+    
+    db.commit()
+    db.refresh(profile)
+    return format_profile_response(profile)

@@ -6,10 +6,11 @@ import { useAuthStore } from "@/lib/store/auth-store";
 
 interface ResourceStepProps {
   assignedCredits: number;
+  availableCredits: number;
   onChange: (value: number) => void;
 }
 
-export function ResourceStep({ assignedCredits, onChange }: ResourceStepProps) {
+export function ResourceStep({ assignedCredits, availableCredits, onChange }: ResourceStepProps) {
   const { user } = useAuthStore();
 
   return (
@@ -27,15 +28,13 @@ export function ResourceStep({ assignedCredits, onChange }: ResourceStepProps) {
             id="assigned_credits"
             type="number"
             min={1}
-            max={user?.dailyLimit || 100}
+            max={availableCredits}
             value={assignedCredits}
             onChange={(e) => onChange(Number(e.target.value))}
             placeholder="Ej: 30"
-            required
           />
           <p className="text-xs text-muted-foreground italic">
-            Límite global de tu estudio: <strong>{user?.dailyLimit}</strong> fotos/día. 
-            Asegúrate de no exceder los créditos disponibles tras tus otras modelos.
+            Límite disponible: <strong>{availableCredits}</strong> fotos. 
           </p>
         </div>
       </CardContent>

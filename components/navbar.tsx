@@ -26,23 +26,24 @@ import { cn } from "@/lib/utils";
 // ==========================================
 // 1. CONFIGURACIÓN CENTRALIZADA DE RUTAS
 // ==========================================
+// ==========================================
+
 const ROUTES = {
-  // Rutas base (filtradas dinámicamente según el rol más abajo)
+  // Rutas base (filtradas dinámicamente)
   base: [
     { href: "/dashboard", label: "Generar", icon: Sparkles, hideForStudio: true },
     { href: "/gallery", label: "Galeria", icon: Image },
     { href: "/billing", label: "Balance", icon: CreditCard },
   ],
-  // Rutas exclusivas para Super Admin
+  // Rutas exclusivas para Super Admin Macondo
   macondo: [
     { href: "/admin", label: "Dashboard Macondo", icon: LayoutDashboard },
     { href: "/admin/users", label: "Gestión de Usuarios", icon: Users },
+    { href: "/admin/reports", label: "Reportes", icon: Users },
   ],
-  // Rutas exclusivas para Estudios
+  // Rutas exclusivas para Estudios (ELIMINAMOS CUENTAS MODELOS)
   studio: [
-    { href: "/vendor", label: "Dashboard Estudio", icon: LayoutDashboard },
-    { href: "/studio", label: "Gestión de Modelos", icon: UserPlus },
-    { href: "/vendor/users", label: "Cuentas de Modelos", icon: Users },
+    { href: "/studio", label: "Mis Modelos", icon: UserPlus },
   ],
 };
 

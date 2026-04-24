@@ -29,7 +29,8 @@ from api.endpoints.models.services import (
     approve_model_request_service,
     reject_model_request_service,
     confirm_payment_service,
-    get_all_model_profiles
+    get_all_model_profiles,
+    toggle_model_status_service  # <--- IMPORTACIÓN AÑADIDA AQUÍ
 )
 
 router = APIRouter()
@@ -121,3 +122,12 @@ async def get_all_profiles(
     db: Session = Depends(get_db),
 ):
     return get_all_model_profiles(db, current_user["id"], skip, limit, status_filter)
+
+@router.post("/profiles/{profile_id}/toggle-status", response_model=ModelProfileResponse)
+async def toggle_model_status(
+    profile_id: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Pausa o Activa a una modelo."""
+    return toggle_model_status_service(db, current_user["id"], profile_id)

@@ -371,11 +371,13 @@ class APIClient {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
+
     const response = await fetch(`${API_BASE_URL}${usePrefix}${endpoint}`, {
       ...options,
       headers,
       credentials: "include", // Incluir cookies en requests
     });
+
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -386,6 +388,7 @@ class APIClient {
     if (response.status === 204) {
       return {} as T;
     }
+
 
     return response.json();
   }
@@ -413,6 +416,11 @@ class APIClient {
 
     this.setToken(response.access_token);
     return response;
+  }
+  async toggleModelStatus(profileId: string): Promise<ModelProfile> {
+    return this.request<ModelProfile>(`/models/profiles/${profileId}/toggle-status`, {
+      method: "POST"
+    });
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -445,6 +453,7 @@ class APIClient {
   async getCurrentUser(): Promise<MeResponse> {
     return this.request<MeResponse>("/auth/me");
   }
+
 
   // ============================================
   // Generation endpoints

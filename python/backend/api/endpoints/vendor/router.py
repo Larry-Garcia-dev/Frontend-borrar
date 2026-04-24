@@ -122,11 +122,36 @@ async def update_vendor_user(
     if user is None or user.studio_id != vendor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
     if payload.daily_limit < 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="daily_limit debe ser mayor a 0.")
+    
+    # 3. VALIDAR LA EDICIÓN DE CRÉDITOS
+    from models.model_profile import ModelCreationRequest, ModelProfile
+    other_models_sum = db.execute(
+        select(func.sum(User.daily_limit)).where(User.studio_id == vendor.id, User.id != user_id)
+    ).scalar() or 0
+    
+    pending_requests = db.query(ModelCreationRequest).filter(
+        ModelCreationRequest.studio_id == vendor.id,
+        ModelCreationRequest.status.in_(["PENDING", "PAYMENT_PENDING"])
+    ).all()
+    
+    pending_sum = sum(int(r.model_info.get("assigned_daily_limit", 0)) if isinstance(r.model_info, dict) else 0 for r in pending_requests)
+    
+    total_requested = other_models_sum + pending_sum + payload.daily_limit
+    if total_requested > vendor.daily_limit:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="daily_limit debe ser mayor o igual a 0.",
+            status_code=400,
+            detail=f"Créditos insuficientes. Límite de estudio: {vendor.daily_limit}. Total asigando: {total_requested}."
         )
+
     assign_plan(user, db, payload.daily_limit)
+    
+    # Actualizar también el Perfil para que se vea reflejado en la UI
+    profile = db.query(ModelProfile).filter(ModelProfile.user_id == user.id).first()
+    if profile:
+        profile.images_per_order = payload.daily_limit
+        
+    db.commit()
     db.refresh(user)
     return _serialize_vendor_user(user)
 
