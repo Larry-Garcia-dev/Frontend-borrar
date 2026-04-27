@@ -11,6 +11,7 @@ import {
   Settings,
   ChevronLeft,
   Shield,
+  Bot,
   AlertTriangle,
   DollarSign,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { useAuthStore } from "@/lib/store/auth-store";
 const sidebarLinks = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Usuarios", icon: Users },
+  { href: "/admin/prompts", label: "Prompts IA", icon: Bot },
   { href: "/admin/reports", label: "Reportes", icon: AlertTriangle },
   { href: "/admin/costs", label: "Costos", icon: DollarSign },
 ];

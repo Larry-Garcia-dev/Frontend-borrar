@@ -17,6 +17,7 @@ import {
   CreditCard,
   UserPlus,
   Shield,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -39,6 +40,7 @@ const ROUTES = {
   macondo: [
     { href: "/admin", label: "Dashboard Macondo", icon: LayoutDashboard },
     { href: "/admin/users", label: "Gestión de Usuarios", icon: Users },
+    { href: "/admin/prompts", label: "Prompts IA", icon: Bot },
     { href: "/admin/reports", label: "Reportes", icon: Users },
   ],
   // Rutas exclusivas para Estudios (ELIMINAMOS CUENTAS MODELOS)

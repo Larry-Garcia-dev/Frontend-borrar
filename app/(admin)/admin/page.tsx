@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Shield,
+  Bot,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAdminStore } from "@/lib/store/admin-store";
@@ -151,6 +152,20 @@ export default function AdminDashboardPage() {
                     <DollarSign className="h-5 w-5 text-primary" />
                     <span className="font-medium text-foreground">
                       Ver Costos por Usuario
+                    </span>
+                  </div>
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground" />
+                </a>
+
+                {/* NUEVO ENLACE A PROMPTS */}
+                <a
+                  href="/admin/prompts"
+                  className="flex items-center justify-between rounded-lg bg-secondary/50 p-4 transition-colors hover:bg-secondary"
+                >
+                  <div className="flex items-center gap-3">
+                    <Bot className="h-5 w-5 text-primary" />
+                    <span className="font-medium text-foreground">
+                      Gestionar Plantillas de Prompt
                     </span>
                   </div>
                   <ArrowUpRight className="h-5 w-5 text-muted-foreground" />
