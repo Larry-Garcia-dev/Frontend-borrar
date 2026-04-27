@@ -12,7 +12,7 @@ export default function AuthCallbackPage() {
   const { handleGoogleCallback } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("Autenticando con Google...");
-  
+
   // Guard to prevent double execution (React 18 strict mode + dependency changes)
   const isProcessingRef = useRef(false);
   const processedCodeRef = useRef<string | null>(null);
@@ -32,18 +32,18 @@ export default function AuthCallbackPage() {
         console.log("[v0] Callback already processing or code already used, skipping...");
         return;
       }
-      
+
       isProcessingRef.current = true;
       processedCodeRef.current = code;
 
       try {
         setStatus("Verificando credenciales...");
-        
+
         // Usar el handleGoogleCallback del store que maneja todo
         const user = await handleGoogleCallback(code);
-        
+
         setStatus("Iniciando sesion...");
-        
+
         // Redirigir segun el rol del usuario
         setTimeout(() => {
           if (user.isAdmin) {
@@ -98,7 +98,7 @@ export default function AuthCallbackPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <ParticleLoader size="lg" />
+            <ParticleLoader message="" />
             <div className="space-y-2">
               <h2 className="text-2xl font-bold text-foreground">{status}</h2>
               <p className="text-muted-foreground">Por favor espera un momento</p>

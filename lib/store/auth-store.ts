@@ -158,7 +158,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.handleGoogleCallback(code);
-      const authUser = parseUserFromCallback(response);
+      const authUser = parseUserFromMe(response); // ✅ SOLUCIÓN: Usar la función que sí existe
       set({
         user: authUser,
         token: response.access_token,

@@ -213,20 +213,22 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }
   },
   approveMedia: async (mediaId) => {
-    try {
-      await api.approveMedia(mediaId);
-      set((state) => ({
-        generations: state.generations.map((g) => 
-          g.id === mediaId ? { ...g, is_approved: true } : g
-        ),
-        currentGeneration: state.currentGeneration?.id === mediaId 
-          ? { ...state.currentGeneration, is_approved: true } 
-          : state.currentGeneration
-      }));
-    } catch (error) {
-      console.error("Error al aprobar media:", error);
-    }
-  },
+  try {
+    await api.approveMedia(mediaId); // Persiste en la DB
+    set((state) => ({
+      // Actualiza la galería para que el cambio se vea al navegar
+      generations: state.generations.map((g) => 
+        g.id === mediaId ? { ...g, is_approved: true } : g
+      ),
+      // Sincroniza con la vista de generación actual
+      currentGeneration: state.currentGeneration?.id === mediaId 
+        ? { ...state.currentGeneration, is_approved: true } 
+        : state.currentGeneration
+    }));
+  } catch (error) {
+    console.error("Error al aprobar media:", error);
+  }
+},
 
   uploadReferenceImages: async (files: File[]) => {
     try {
