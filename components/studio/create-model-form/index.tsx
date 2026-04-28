@@ -15,7 +15,7 @@ interface CreateModelFormProps {
   onSuccess?: () => void;
 }
 
-  export function CreateModelForm({ availableCredits, onSuccess }: CreateModelFormProps) {
+export function CreateModelForm({ availableCredits, onSuccess }: CreateModelFormProps) {
   const { user: studioUser } = useAuthStore();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,8 +52,7 @@ interface CreateModelFormProps {
     try {
       setUploadingPhotos(true);
       const filesToUpload = photos.filter(p => !p.url).map(p => p.file);
-      const { urls } = await api.uploadTrainingPhotos(filesToUpload);
-
+      const { urls } = await api.uploadTrainingPhotos(filesToUpload, formData.model_email);
       await api.requestModelCreation({
         model_email: formData.model_email,
         model_name: formData.model_name,
@@ -89,7 +88,7 @@ interface CreateModelFormProps {
           <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
             <ResourceStep
               assignedCredits={formData.assigned_credits}
-              onChange={(val) => setFormData({...formData, assigned_credits: val})}
+              onChange={(val) => setFormData({ ...formData, assigned_credits: val })}
             />
 
             <InfoStep

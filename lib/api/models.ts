@@ -37,9 +37,15 @@ export const createModelsApi = (client: BaseAPIClient) => ({
   async toggleModelStatus(profileId: string): Promise<ModelProfile> {
     return client.request<ModelProfile>(`/models/profiles/${profileId}/toggle-status`, { method: "POST" });
   },
-  async uploadTrainingPhotos(files: File[]): Promise<{ urls: string[] }> {
+  async uploadTrainingPhotos(files: File[], modelEmail?: string): Promise<{ urls: string[] }> {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
+    
+    // Si viene el email, lo agregamos al payload
+    if (modelEmail) {
+      formData.append("model_email", modelEmail);
+    }
+
     const headers: HeadersInit = {};
     const token = client.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -50,6 +56,7 @@ export const createModelsApi = (client: BaseAPIClient) => ({
       body: formData,
       credentials: "include",
     });
+    
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.detail || `Error: ${response.status}`);

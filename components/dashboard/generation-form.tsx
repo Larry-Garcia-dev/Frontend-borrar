@@ -29,7 +29,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     referenceImageUrls, setReferenceImageUrls, uploadReferenceImages,
     parentMediaId, parentEditCount, cancelEdit,
   } = useGenerationStore();
-
+  const isModeloOrStudio = user?.role === "MODELO" || user?.role === "ESTUDIO_ADMIN" || user?.isStudioAdmin;
   const isEditing = !!parentMediaId;
   const editsRemaining = Math.max(0, 2 - parentEditCount);
   const editIsFree = parentEditCount < 2;
@@ -87,7 +87,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
           {/* Edit mode banner */}
           {isEditing && (
@@ -159,29 +159,31 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
           </div>
 
           {/* 4. Imágenes de Referencia */}
-          <div className="space-y-3">
-            <label className="block text-base font-medium text-foreground">Imágenes de referencia (opcional)</label>
-            <div className="flex flex-wrap gap-2">
-              {referenceImageUrls.map((url, index) => (
-                <div key={index} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
-                  <img src={url} alt={`Reference ${index + 1}`} className="h-full w-full object-cover" />
-                  <button
-                    onClick={() => setReferenceImageUrls(referenceImageUrls.filter((_, i) => i !== index))}
-                    className="absolute -right-1 -top-1 rounded-full bg-destructive p-1 text-destructive-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-              {referenceImageUrls.length < 8 && (
-                <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border transition-colors hover:border-primary">
-                  <Upload className="h-5 w-5 text-muted-foreground" />
-                  <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={handleFileUpload} className="hidden" />
-                </label>
-              )}
+          {!isModeloOrStudio && (
+            <div className="space-y-3">
+              <label className="block text-base font-medium text-foreground">Imágenes de referencia (opcional)</label>
+              <div className="flex flex-wrap gap-2">
+                {referenceImageUrls.map((url, index) => (
+                  <div key={index} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
+                    <img src={url} alt={`Reference ${index + 1}`} className="h-full w-full object-cover" />
+                    <button
+                      onClick={() => setReferenceImageUrls(referenceImageUrls.filter((_, i) => i !== index))}
+                      className="absolute -right-1 -top-1 rounded-full bg-destructive p-1 text-destructive-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {referenceImageUrls.length < 8 && (
+                  <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border transition-colors hover:border-primary">
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={handleFileUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Máximo 8 imágenes. PNG, JPG o WEBP.</p>
             </div>
-            <p className="text-xs text-muted-foreground">Máximo 8 imágenes. PNG, JPG o WEBP.</p>
-          </div>
+          )}
 
           {/* Error & Submit */}
           {error && (
