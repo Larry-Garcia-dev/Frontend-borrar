@@ -58,11 +58,10 @@ export default function VendorUsersPage() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
+    if (!confirm("¿Estás seguro de eliminar este usuario? Los créditos no consumidos se devolverán a tu balance.")) return;
     await deleteUser(userId);
     setMenuOpen(null);
   };
-
   return (
     <div className="space-y-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

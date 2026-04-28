@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation"; // <-- Añadido useRouter
 import { motion } from "framer-motion";
 import {
   CreditCard,
@@ -27,6 +28,7 @@ const recordTypeConfig: Record<string, { icon: React.ElementType; color: string;
 };
 
 export default function BillingPage() {
+  const router = useRouter(); // <-- Inicializar el router
   const { user } = useAuthStore();
   const [balance, setBalance] = useState<UserBalance | null>(null);
   const [records, setRecords] = useState<BillingRecord[]>([]);
@@ -34,10 +36,14 @@ export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<"all" | "costs" | "payments">("all");
 
   const isStudioAdmin = user?.isStudioAdmin || user?.isMacondoAdmin;
-
+  const isModel = user?.role === "MODELO"; // <-- Identificar rol modelo
   useEffect(() => {
+    if (isModel) {
+      router.push("/dashboard");
+      return;
+    }
     loadBillingData();
-  }, []);
+  }, [isModel, router]);
 
   const loadBillingData = async () => {
     setIsLoading(true);
@@ -78,8 +84,8 @@ export default function BillingPage() {
           {isStudioAdmin ? "Actividad del Estudio" : "Mi Balance"}
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base mt-2">
-          {isStudioAdmin 
-            ? "Monitoreo de generaciones y consumo por modelo." 
+          {isStudioAdmin
+            ? "Monitoreo de generaciones y consumo por modelo."
             : "Revisa tu historial de costos y pagos."}
         </p>
       </div>
@@ -170,31 +176,28 @@ export default function BillingPage() {
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
               <button
                 onClick={() => setActiveTab("all")}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "all"
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === "all"
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Todos
               </button>
               <button
                 onClick={() => setActiveTab("costs")}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "costs"
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === "costs"
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Costos
               </button>
               <button
                 onClick={() => setActiveTab("payments")}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === "payments"
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === "payments"
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Pagos
               </button>
@@ -240,7 +243,7 @@ export default function BillingPage() {
                           {/* Si es Admin Estudio, muestra el ID del media y la opción de auditar */}
                           {isStudioAdmin && record.media_id && (
                             <span className="px-2 py-0.5 rounded bg-background border text-xs font-mono text-muted-foreground">
-                              ID: {record.media_id.slice(0,8)}...
+                              ID: {record.media_id.slice(0, 8)}...
                             </span>
                           )}
                         </div>
@@ -259,9 +262,9 @@ export default function BillingPage() {
 
                       {/* Botón de Auditoría de Imagen para el Estudio */}
                       {isStudioAdmin && record.media_id && (
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           className="shrink-0"
                           onClick={() => toast.info("Funcionalidad para auditar imagen en desarrollo.")}
                         >

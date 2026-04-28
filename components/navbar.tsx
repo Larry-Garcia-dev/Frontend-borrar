@@ -4,129 +4,38 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Sparkles,
-  Image,
-  Users,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
-  LayoutDashboard,
-  Store,
-  CreditCard,
-  UserPlus,
-  Shield,
-  Bot,
-} from "lucide-react";
+import { Sparkles, LogOut, Menu, X, ChevronDown, Shield, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
-import { cn } from "@/lib/utils";
 
-// ==========================================
-// 1. CONFIGURACIÓN CENTRALIZADA DE RUTAS
-// ==========================================
-// ==========================================
-
-const ROUTES = {
-  // Rutas base (filtradas dinámicamente)
-  base: [
-    { href: "/dashboard", label: "Generar", icon: Sparkles, hideForStudio: true },
-    { href: "/gallery", label: "Galeria", icon: Image },
-    { href: "/billing", label: "Balance", icon: CreditCard },
-  ],
-  // Rutas exclusivas para Super Admin Macondo
-  macondo: [
-    { href: "/admin", label: "Dashboard Macondo", icon: LayoutDashboard },
-    { href: "/admin/users", label: "Gestión de Usuarios", icon: Users },
-    { href: "/admin/prompts", label: "Prompts IA", icon: Bot },
-    { href: "/admin/reports", label: "Reportes", icon: Users },
-  ],
-  // Rutas exclusivas para Estudios (ELIMINAMOS CUENTAS MODELOS)
-  studio: [
-    { href: "/studio", label: "Mis Modelos", icon: UserPlus },
-  ],
-};
-
-// ==========================================
-// 2. SUB-COMPONENTES DE INTERFAZ (UI)
-// ==========================================
-
-const NavItem = ({ link, isActive, onClick, isMobile = false }: any) => {
-  const Icon = link.icon;
-
-  if (isMobile) {
-    return (
-      <Link href={link.href} onClick={onClick}>
-        <div className={cn("flex items-center gap-3 rounded-lg px-4 py-3 text-lg hover:bg-secondary", isActive && "bg-primary/10 text-primary")}>
-          <Icon className="h-5 w-5" />
-          {link.label}
-        </div>
-      </Link>
-    );
-  }
-
-  return (
-    <Link href={link.href}>
-      <Button variant={isActive ? "secondary" : "ghost"} className={cn("gap-2 text-base", isActive && "bg-primary/10 text-primary")}>
-        <Icon className="h-5 w-5" />
-        {link.label}
-      </Button>
-    </Link>
-  );
-};
-
-const NavDropdown = ({ title, icon: Icon, links, isOpen, onToggle }: any) => {
-  const pathname = usePathname();
-  return (
-    <div className="relative">
-      <Button variant="ghost" className="gap-2 text-base" onClick={onToggle}>
-        <Icon className="h-5 w-5" /> {title} <ChevronDown className="h-4 w-4" />
-      </Button>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-            className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-card p-2 shadow-xl"
-          >
-            {links.map((link: any) => (
-              <Link key={link.href} href={link.href} onClick={onToggle}>
-                <div className={cn("flex items-center gap-3 rounded-lg px-4 py-3 text-base hover:bg-secondary", pathname === link.href && "bg-primary/10 text-primary")}>
-                  <link.icon className="h-5 w-5" /> {link.label}
-                </div>
-              </Link>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// ==========================================
-// 3. COMPONENTE PRINCIPAL
-// ==========================================
+// Importamos los nuevos componentes divididos
+import { ROUTES } from "./navbar/config";
+import { NavItem } from "./navbar/nav-item";
+import { NavDropdown } from "./navbar/nav-dropdown";
+import { MobileMenu } from "./navbar/mobile-menu";
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, logout, isAuthenticated } = useAuthStore();
   
-  // Estados para controlar qué menú está abierto (solo permitimos un dropdown abierto a la vez)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   // Verificación de Roles
   const isMacondoAdmin = user?.isMacondoAdmin || user?.role === "MACONDO_ADMIN";
   const isStudioAdmin = user?.isStudioAdmin || user?.role === "ESTUDIO_ADMIN";
+  const isModel = user?.role === "MODELO"; // <-- Nueva verificación
 
-  // Créditos restantes
   const remainingCredits = user ? (user.isUnlimited ? "Ilimitado" : user.dailyLimit - user.usedQuota) : 0;
 
-  // Filtrado de las rutas bases (Aplica la regla de que el Estudio no ve "Generar")
-  const visibleBaseLinks = ROUTES.base.filter(link => !(isStudioAdmin && link.hideForStudio));
+  // Filtrado de las rutas bases teniendo en cuenta la ocultación para modelos
+  const visibleBaseLinks = ROUTES.base.filter(link => {
+    if (isStudioAdmin && link.hideForStudio) return false;
+    if (isModel && link.hideForModel) return false; // <-- Oculta Balance a las Modelos
+    return true;
+  });
 
-  // Función para alternar menús
   const toggleDropdown = (menuName: string) => {
     setOpenDropdown(openDropdown === menuName ? null : menuName);
   };
@@ -213,58 +122,18 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* NAVEGACIÓN MÓVIL */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="border-t border-border bg-card md:hidden overflow-hidden">
-            <div className="space-y-2 p-4">
-              {isAuthenticated ? (
-                <>
-                  {user && (
-                    <div className="flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-3 mb-4">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">{remainingCredits} créditos</span>
-                    </div>
-                  )}
-
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4 px-2">Navegación</div>
-                  {visibleBaseLinks.map((link) => (
-                    <NavItem key={link.href} link={link} isActive={pathname === link.href} isMobile onClick={() => setMobileMenuOpen(false)} />
-                  ))}
-
-                  {isMacondoAdmin && (
-                    <>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4 px-2">Admin Macondo</div>
-                      {ROUTES.macondo.map((link) => (
-                        <NavItem key={link.href} link={link} isActive={pathname === link.href} isMobile onClick={() => setMobileMenuOpen(false)} />
-                      ))}
-                    </>
-                  )}
-
-                  {isStudioAdmin && (
-                    <>
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4 px-2">Panel de Estudio</div>
-                      {ROUTES.studio.map((link) => (
-                        <NavItem key={link.href} link={link} isActive={pathname === link.href} isMobile onClick={() => setMobileMenuOpen(false)} />
-                      ))}
-                    </>
-                  )}
-
-                  <div className="my-4 border-t border-border"></div>
-
-                  <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-lg text-destructive hover:bg-destructive/10">
-                    <LogOut className="h-5 w-5" /> Cerrar sesión
-                  </button>
-                </>
-              ) : (
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" size="lg" className="w-full">Iniciar Sesión</Button>
-                </Link>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* NAVEGACIÓN MÓVIL (Componente importado) */}
+      <MobileMenu 
+        isOpen={mobileMenuOpen} 
+        onClose={() => setMobileMenuOpen(false)}
+        user={user}
+        isAuthenticated={isAuthenticated}
+        logout={logout}
+        visibleBaseLinks={visibleBaseLinks}
+        isMacondoAdmin={isMacondoAdmin}
+        isStudioAdmin={isStudioAdmin}
+        remainingCredits={remainingCredits}
+      />
     </nav>
   );
 }

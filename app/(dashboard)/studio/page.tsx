@@ -38,7 +38,7 @@ export default function StudioPage() {
   const totalPendingRequests = requests
     .filter(r => ["PENDING", "PAYMENT_PENDING"].includes(r.status))
     .reduce((acc, r) => acc + (Number(r.model_info?.assigned_daily_limit) || 0), 0);
-  
+
   const availableCredits = Math.max(0, (user?.dailyLimit || 0) - (totalAssignedModels + totalPendingRequests));
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function StudioPage() {
     try {
       const [requestsData, modelsData] = await Promise.all([api.getMyModelRequests(), api.getMyModels()]);
       setRequests(requestsData); setModels(modelsData);
-    } catch (error) { toast.error("Error cargando el estudio"); } 
+    } catch (error) { toast.error("Error cargando el estudio"); }
     finally { setIsLoading(false); }
   };
 
@@ -84,7 +84,7 @@ export default function StudioPage() {
   };
 
   const handleDeleteModel = async (userId: string) => {
-    if (confirm("¿Estás seguro de que deseas borrar esta modelo? Sus créditos se liberarán.")) {
+    if (confirm("¿Estás seguro de que deseas borrar esta modelo? Los créditos no consumidos se devolverán a tu balance.")) {
       try {
         await api.deleteVendorUser(userId);
         toast.success("Modelo borrada");
