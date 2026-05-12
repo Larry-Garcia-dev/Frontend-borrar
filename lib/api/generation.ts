@@ -1,6 +1,6 @@
 import { BaseAPIClient } from './core';
 import { API_BASE_URL, API_PREFIX } from './config';
-import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport } from './types';
+import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport, ExplicitGenerationRequest } from './types';
 
 export const createGenerationApi = (client: BaseAPIClient) => {
   const apiMethods = {
@@ -64,6 +64,18 @@ export const createGenerationApi = (client: BaseAPIClient) => {
     },
     async approveMedia(mediaId: string): Promise<{ detail: string }> {
       return client.request<{ detail: string }>(`/generation/${mediaId}/approve`, { method: "POST" });
+    },
+    
+    // Generación explícita con 3 imágenes (fondo, pose, referencia)
+    async createExplicitGeneration(data: ExplicitGenerationRequest): Promise<GenerationTaskResponse> {
+      return client.request<GenerationTaskResponse>("/generation/explicit", { method: "POST", body: JSON.stringify(data) });
+    },
+    
+    async generateExplicitImage(data: ExplicitGenerationRequest): Promise<GeneratedMedia> {
+      const task = await apiMethods.createExplicitGeneration(data);
+      const result = await apiMethods.waitForGeneration(task.task_id);
+      if (!result) throw new Error("No se pudo obtener el resultado de la generación explícita");
+      return result;
     }
   };
   return apiMethods;

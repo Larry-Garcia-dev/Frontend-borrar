@@ -62,25 +62,48 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
   const canGenerate = selectedBackground && selectedPose && selectedPhoto;
 
+  const [isGeneratingExplicit, setIsGeneratingExplicit] = useState(false);
+  const [explicitError, setExplicitError] = useState<string | null>(null);
+
   const handleGenerate = async () => {
-    if (!canGenerate) return;
+    if (!canGenerate || !selectedBackground || !selectedPose || !selectedPhoto) return;
     
-    clearError();
+    setExplicitError(null);
+    setIsGeneratingExplicit(true);
     onGenerateStart();
 
-    // Construir el prompt basado en las selecciones
-    const background = BACKGROUNDS.find(b => b.id === selectedBackground);
-    const pose = POSES.find(p => p.id === selectedPose);
-    
-    const prompt = `Professional photo shoot, ${pose?.name} pose, in a ${background?.name} setting, high quality, detailed, realistic lighting`;
-    setPrompt(prompt);
-    
-    // Usar la foto seleccionada como referencia
-    if (selectedPhoto) {
-      setReferenceImageUrls([selectedPhoto]);
-    }
+    try {
+      // Obtener las URLs completas de las imágenes
+      const background = BACKGROUNDS.find(b => b.id === selectedBackground);
+      const pose = POSES.find(p => p.id === selectedPose);
+      
+      if (!background || !pose) {
+        throw new Error("Fondo o pose no encontrados");
+      }
 
-    await generate();
+      // Construir URLs absolutas para fondo y pose (assets locales)
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const backgroundUrl = `${baseUrl}${background.image}`;
+      const poseUrl = `${baseUrl}${pose.image}`;
+
+      // Llamar al endpoint de generación explícita
+      const result = await api.generateExplicitImage({
+        background_url: backgroundUrl,
+        pose_url: poseUrl,
+        reference_url: selectedPhoto,
+        additional_prompt: `${background.name} setting, ${pose.name} pose`,
+        width: 1024,
+        height: 1024,
+      });
+
+      // La imagen se generó correctamente, el store se actualizará automáticamente
+      console.log("[v0] Explicit generation completed:", result);
+    } catch (err: any) {
+      console.error("[v0] Explicit generation error:", err);
+      setExplicitError(err.message || "Error al generar la imagen");
+    } finally {
+      setIsGeneratingExplicit(false);
+    }
   };
 
   const goToStep = (newStep: Step) => {
@@ -393,13 +416,13 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   </div>
                 </div>
 
-                {error && (
+                {(error || explicitError) && (
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }} 
                     animate={{ opacity: 1, y: 0 }} 
                     className="rounded-lg bg-destructive/10 p-4 text-center text-destructive"
                   >
-                    {error}
+                    {explicitError || error}
                   </motion.div>
                 )}
 
@@ -412,12 +435,23 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   </Button>
                   <Button
                     onClick={handleGenerate}
-                    disabled={isGenerating || !canGenerate || (!user?.isUnlimited && remainingCredits <= 0)}
-                    isLoading={isGenerating}
+                    disabled={isGeneratingExplicit || !canGenerate || (!user?.isUnlimited && remainingCredits <= 0)}
                     className="bg-gradient-to-r from-rose-500 to-purple-500 hover:from-rose-600 hover:to-purple-600"
                   >
-                    {!isGenerating && <Sparkles className="h-5 w-5 mr-2" />}
-                    {isGenerating ? "Generando..." : "Generar Imagen"}
+                    {isGeneratingExplicit ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generando...
+                      </span>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5 mr-2" />
+                        Generar Imagen
+                      </>
+                    )}
                   </Button>
                 </div>
 

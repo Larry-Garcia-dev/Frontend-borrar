@@ -13,7 +13,7 @@ from models.prompt import PromptTemplate
 from models.user import User
 from services.credit_service import validate_and_consume_credit
 from services.storage import storage_client
-from worker.tasks import generate_image_task, generate_video_task
+from worker.tasks import generate_image_task, generate_video_task, generate_explicit_image_task
 
 router = APIRouter()
 
@@ -36,6 +36,16 @@ class GenerationRequest(BaseModel):
     model: str = "qwen-image-2.0-pro"
     template_id: Optional[str] = None
     parent_media_id: Optional[str] = None
+
+
+class ExplicitGenerationRequest(BaseModel):
+    """Request para generación de contenido explícito con 3 imágenes."""
+    background_url: str  # URL de la imagen de fondo seleccionada
+    pose_url: str  # URL de la imagen de pose seleccionada
+    reference_url: str  # URL de la foto de referencia de la modelo
+    additional_prompt: str = ""  # Instrucciones adicionales opcionales
+    width: int = 1024
+    height: int = 1024
 
 
 class ReferenceImagesResponse(BaseModel):
@@ -246,6 +256,56 @@ def _serialize_task_detail(info: Any) -> str:
         if "storage_urls" in info:
             return "Generation completed."
     return str(info)
+
+@router.post("/explicit", response_model=GenerationResponse)
+async def create_explicit_generation(
+    request: ExplicitGenerationRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera una imagen explícita usando 3 imágenes de referencia:
+    - background_url: Fondo seleccionado (piscina, cocina, etc.)
+    - pose_url: Pose seleccionada
+    - reference_url: Foto de referencia de la modelo
+    """
+    from models.model_profile import ModelProfile
+    from models.user import UserRole
+    
+    user = db.get(User, current_user["id"])
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    
+    # Verificar que el usuario es modelo y tiene contenido explícito habilitado
+    if user.role != UserRole.MODELO:
+        raise HTTPException(status_code=403, detail="Solo modelos pueden generar contenido explícito.")
+    
+    profile = db.query(ModelProfile).filter(ModelProfile.user_id == user.id).first()
+    if not profile or not profile.is_explicit:
+        raise HTTPException(status_code=403, detail="No tienes habilitado el contenido explícito.")
+    
+    # Consumir crédito
+    try:
+        validate_and_consume_credit(user, db)
+    except ValueError:
+        raise HTTPException(
+            status_code=429,
+            detail="No tienes créditos disponibles.",
+        )
+    
+    # Encolar la tarea de generación explícita
+    task = generate_explicit_image_task.delay(
+        background_url=request.background_url,
+        pose_url=request.pose_url,
+        reference_url=request.reference_url,
+        additional_prompt=request.additional_prompt,
+        width=request.width,
+        height=request.height,
+        user_id=str(current_user["id"]),
+    )
+    
+    return GenerationResponse(task_id=task.id, status="queued", detail="Generación explícita encolada.")
+
 
 @router.post("/{media_id}/approve")
 async def approve_media(
