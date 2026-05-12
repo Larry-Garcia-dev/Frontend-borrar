@@ -22,6 +22,8 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const [photos, setPhotos] = useState<{ file: File; preview: string; url?: string }[]>([]);
+  const [explicitPhotos, setExplicitPhotos] = useState<{ file: File; preview: string; url?: string; poseId: string }[]>([]);
+  const [isExplicit, setIsExplicit] = useState(false);
   const [formData, setFormData] = useState({
     model_email: "",
     model_name: "",
@@ -39,6 +41,7 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (photos.length < 5) return toast.error("Se requieren al menos 5 fotos.");
+    if (isExplicit && explicitPhotos.length < 8) return toast.error("Se requieren 8 fotos explícitas.");
 
     // Validación de lógica de créditos: No puede asignar más de lo que el estudio tiene en total
     // if (formData.assigned_credits > (studioUser?.dailyLimit || 0)) {
@@ -51,8 +54,18 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
     setIsSubmitting(true);
     try {
       setUploadingPhotos(true);
+      // Subir fotos normales
       const filesToUpload = photos.filter(p => !p.url).map(p => p.file);
       const { urls } = await api.uploadTrainingPhotos(filesToUpload, formData.model_email);
+      
+      // Subir fotos explícitas si aplica
+      let explicitUrls: string[] = [];
+      if (isExplicit && explicitPhotos.length > 0) {
+        const explicitFilesToUpload = explicitPhotos.filter(p => !p.url).map(p => p.file);
+        const explicitResult = await api.uploadTrainingPhotos(explicitFilesToUpload, formData.model_email);
+        explicitUrls = explicitResult.urls;
+      }
+
       await api.requestModelCreation({
         model_email: formData.model_email,
         model_name: formData.model_name,
@@ -60,7 +73,9 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
         training_photos: urls,
         model_info: {
           ...formData,
-          assigned_daily_limit: formData.assigned_credits // Enviamos la cuota al backend
+          assigned_daily_limit: formData.assigned_credits,
+          is_explicit: isExplicit,
+          explicit_training_photos: explicitUrls,
         },
       });
 
@@ -82,6 +97,10 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
             key="step1"
             photos={photos}
             setPhotos={setPhotos}
+            explicitPhotos={explicitPhotos}
+            setExplicitPhotos={setExplicitPhotos}
+            isExplicit={isExplicit}
+            setIsExplicit={setIsExplicit}
             onNext={() => setStep(2)}
           />
         ) : (
