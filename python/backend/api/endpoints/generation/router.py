@@ -40,9 +40,9 @@ class GenerationRequest(BaseModel):
 
 class ExplicitGenerationRequest(BaseModel):
     """Request para generación de contenido explícito con 3 imágenes."""
-    background_url: str  # URL de la imagen de fondo seleccionada
-    pose_url: str  # URL de la imagen de pose seleccionada
-    reference_url: str  # URL de la foto de referencia de la modelo
+    background_b64: str  # Base64 de la imagen de fondo seleccionada
+    pose_b64: str  # Base64 de la imagen de pose seleccionada
+    reference_url: str  # URL de la foto de referencia de la modelo (ya está en servidor)
     additional_prompt: str = ""  # Instrucciones adicionales opcionales
     width: int = 1024
     height: int = 1024
@@ -265,9 +265,9 @@ async def create_explicit_generation(
 ):
     """
     Genera una imagen explícita usando 3 imágenes de referencia:
-    - background_url: Fondo seleccionado (piscina, cocina, etc.)
-    - pose_url: Pose seleccionada
-    - reference_url: Foto de referencia de la modelo
+    - background_b64: Base64 del fondo seleccionado (piscina, cocina, etc.)
+    - pose_b64: Base64 de la pose seleccionada
+    - reference_url: URL de la foto de referencia de la modelo
     """
     from models.model_profile import ModelProfile
     from models.user import UserRole
@@ -293,10 +293,10 @@ async def create_explicit_generation(
             detail="No tienes créditos disponibles.",
         )
     
-    # Encolar la tarea de generación explícita
+    # Encolar la tarea de generación explícita con base64 para fondo y pose
     task = generate_explicit_image_task.delay(
-        background_url=request.background_url,
-        pose_url=request.pose_url,
+        background_b64=request.background_b64,
+        pose_b64=request.pose_b64,
         reference_url=request.reference_url,
         additional_prompt=request.additional_prompt,
         width=request.width,
