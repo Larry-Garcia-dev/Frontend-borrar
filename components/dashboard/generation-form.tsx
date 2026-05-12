@@ -1,11 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Wand2, Upload, X, Edit3 } from "lucide-react";
+import { Sparkles, Wand2, Upload, X, Edit3, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
+import { api } from "@/lib/api-client";
+import { ModelProfile } from "@/lib/api/types";
+import { ExplicitGenerationForm } from "./explicit-generation-form";
 
 const SIZE_OPTIONS = [
   { value: "1080x1080 (1:1)", label: "1080 x 1080 (Carrusel/Cuadrado 1:1)", width: 1080, height: 1080 },
@@ -29,10 +34,44 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     referenceImageUrls, setReferenceImageUrls, uploadReferenceImages,
     parentMediaId, parentEditCount, cancelEdit,
   } = useGenerationStore();
+  
+  const [isExplicitMode, setIsExplicitMode] = useState(false);
+  const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  
+  const isModelo = user?.role === "MODELO";
   const isModeloOrStudio = user?.role === "MODELO" || user?.role === "ESTUDIO_ADMIN" || user?.isStudioAdmin;
   const isEditing = !!parentMediaId;
   const editsRemaining = Math.max(0, 2 - parentEditCount);
   const editIsFree = parentEditCount < 2;
+
+  // Cargar perfil del modelo para verificar si tiene contenido explícito
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (isModelo) {
+        setLoadingProfile(true);
+        try {
+          const profile = await api.getMyProfile();
+          setModelProfile(profile);
+        } catch (err) {
+          console.log("[v0] No model profile found");
+        } finally {
+          setLoadingProfile(false);
+        }
+      }
+    };
+    fetchProfile();
+  }, [isModelo]);
+
+  // Si es modo explícito y tiene perfil, mostrar el formulario explícito
+  if (isExplicitMode && modelProfile?.is_explicit && modelProfile) {
+    return (
+      <ExplicitGenerationForm 
+        onGenerateStart={onGenerateStart} 
+        modelProfile={modelProfile}
+      />
+    );
+  }
 
   const remainingCredits = user
     ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
@@ -89,6 +128,26 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
         </CardHeader>
 
         <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+          {/* Toggle Explícita - Solo visible para modelos con contenido explícito */}
+          {isModelo && modelProfile?.is_explicit && (
+            <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-rose-500/10 to-purple-500/10 border border-rose-500/20 p-4">
+              <div className="flex items-center gap-3">
+                <Flame className="h-5 w-5 text-rose-500" />
+                <div>
+                  <p className="font-medium text-foreground">Modo Explícito</p>
+                  <p className="text-sm text-muted-foreground">
+                    Genera contenido exclusivo con poses y fondos
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={isExplicitMode}
+                onCheckedChange={setIsExplicitMode}
+                className="data-[state=checked]:bg-rose-500"
+              />
+            </div>
+          )}
+
           {/* Edit mode banner */}
           {isEditing && (
             <div className="flex items-center justify-between rounded-lg bg-primary/10 p-4">

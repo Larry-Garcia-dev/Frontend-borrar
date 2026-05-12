@@ -1,0 +1,436 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGenerationStore } from "@/lib/store/generation-store";
+import { useAuthStore } from "@/lib/store/auth-store";
+import { api } from "@/lib/api-client";
+import { ModelProfile } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
+
+// Fondos disponibles
+const BACKGROUNDS = [
+  { id: "pool", name: "Piscina", image: "/backgrounds/pool.jpg" },
+  { id: "kitchen", name: "Cocina Moderna", image: "/backgrounds/kitchen.jpg" },
+  { id: "living-room", name: "Sala Moderna", image: "/backgrounds/living-room.jpg" },
+  { id: "bar", name: "Bar/Lounge", image: "/backgrounds/bar.jpg" },
+  { id: "bedroom", name: "Dormitorio", image: "/backgrounds/bedroom.jpg" },
+  { id: "terrace", name: "Terraza", image: "/backgrounds/terrace.jpg" },
+  { id: "bathroom", name: "Baño Spa", image: "/backgrounds/bathroom.jpg" },
+  { id: "studio", name: "Estudio Foto", image: "/backgrounds/studio.jpg" },
+];
+
+// Poses disponibles (usando las mismas del entrenamiento explícito)
+const POSES = [
+  { id: "pose-1", name: "De pie", image: "/poses/explicit/pose-1.jpg" },
+  { id: "pose-2", name: "Arrodillada", image: "/poses/explicit/pose-2.jpg" },
+  { id: "pose-3", name: "Acostada", image: "/poses/explicit/pose-3.jpg" },
+  { id: "pose-4", name: "En cuatro", image: "/poses/explicit/pose-4.jpg" },
+  { id: "pose-5", name: "Inclinada", image: "/poses/explicit/pose-5.jpg" },
+  { id: "pose-6", name: "Sentada", image: "/poses/explicit/pose-6.jpg" },
+  { id: "pose-7", name: "Boca abajo", image: "/poses/explicit/pose-7.jpg" },
+  { id: "pose-8", name: "Arqueada", image: "/poses/explicit/pose-8.jpg" },
+];
+
+type Step = "background" | "pose" | "photo" | "confirm";
+
+interface ExplicitGenerationFormProps {
+  onGenerateStart: () => void;
+  modelProfile: ModelProfile;
+}
+
+export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: ExplicitGenerationFormProps) {
+  const { user } = useAuthStore();
+  const {
+    isGenerating, error, generate, clearError,
+    setPrompt, setReferenceImageUrls,
+  } = useGenerationStore();
+
+  const [step, setStep] = useState<Step>("background");
+  const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
+  const [selectedPose, setSelectedPose] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
+  const trainingPhotos = modelProfile.explicit_training_photos || [];
+  
+  const remainingCredits = user
+    ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
+    : 0;
+
+  const canGenerate = selectedBackground && selectedPose && selectedPhoto;
+
+  const handleGenerate = async () => {
+    if (!canGenerate) return;
+    
+    clearError();
+    onGenerateStart();
+
+    // Construir el prompt basado en las selecciones
+    const background = BACKGROUNDS.find(b => b.id === selectedBackground);
+    const pose = POSES.find(p => p.id === selectedPose);
+    
+    const prompt = `Professional photo shoot, ${pose?.name} pose, in a ${background?.name} setting, high quality, detailed, realistic lighting`;
+    setPrompt(prompt);
+    
+    // Usar la foto seleccionada como referencia
+    if (selectedPhoto) {
+      setReferenceImageUrls([selectedPhoto]);
+    }
+
+    await generate();
+  };
+
+  const goToStep = (newStep: Step) => {
+    setStep(newStep);
+  };
+
+  const getStepNumber = (s: Step) => {
+    switch (s) {
+      case "background": return 1;
+      case "pose": return 2;
+      case "photo": return 3;
+      case "confirm": return 4;
+    }
+  };
+
+  const currentStepNum = getStepNumber(step);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: -20 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      transition={{ delay: 0.1 }} 
+      className="w-full lg:w-1/2"
+    >
+      <Card className="h-full bg-gradient-to-br from-rose-950/20 to-purple-950/20 border-rose-500/20">
+        <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl">
+              <Wand2 className="h-5 w-5 sm:h-6 sm:w-6 text-rose-400" />
+              <span className="bg-gradient-to-r from-rose-400 to-purple-400 bg-clip-text text-transparent">
+                Contenido Exclusivo
+              </span>
+            </CardTitle>
+            <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 sm:px-4 sm:py-2">
+              <Sparkles className="h-4 w-4 text-rose-400" />
+              <span className="text-xs sm:text-sm font-medium text-rose-300">
+                {user?.isUnlimited ? "Ilimitado" : remainingCredits} créditos
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Steps */}
+          <div className="flex items-center justify-between mt-4">
+            {["Fondo", "Pose", "Foto", "Generar"].map((label, idx) => (
+              <div key={label} className="flex items-center">
+                <div className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all",
+                  idx + 1 <= currentStepNum 
+                    ? "bg-rose-500 text-white" 
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {idx + 1 < currentStepNum ? <Check className="h-4 w-4" /> : idx + 1}
+                </div>
+                <span className={cn(
+                  "ml-2 text-xs hidden sm:inline",
+                  idx + 1 <= currentStepNum ? "text-rose-300" : "text-muted-foreground"
+                )}>
+                  {label}
+                </span>
+                {idx < 3 && (
+                  <div className={cn(
+                    "w-8 sm:w-12 h-0.5 mx-2",
+                    idx + 1 < currentStepNum ? "bg-rose-500" : "bg-muted"
+                  )} />
+                )}
+              </div>
+            ))}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
+          <AnimatePresence mode="wait">
+            {/* Step 1: Seleccionar Fondo */}
+            {step === "background" && (
+              <motion.div
+                key="background"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-rose-400" />
+                  Selecciona el fondo
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {BACKGROUNDS.map((bg) => (
+                    <button
+                      key={bg.id}
+                      onClick={() => setSelectedBackground(bg.id)}
+                      className={cn(
+                        "relative aspect-video rounded-xl overflow-hidden border-2 transition-all",
+                        selectedBackground === bg.id
+                          ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
+                          : "border-transparent hover:border-rose-500/50"
+                      )}
+                    >
+                      <img
+                        src={bg.image}
+                        alt={bg.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
+                        {bg.name}
+                      </span>
+                      {selectedBackground === bg.id && (
+                        <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => goToStep("pose")}
+                    disabled={!selectedBackground}
+                    className="bg-rose-500 hover:bg-rose-600"
+                  >
+                    Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 2: Seleccionar Pose */}
+            {step === "pose" && (
+              <motion.div
+                key="pose"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <User className="h-5 w-5 text-rose-400" />
+                  Selecciona la pose
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {POSES.map((pose) => (
+                    <button
+                      key={pose.id}
+                      onClick={() => setSelectedPose(pose.id)}
+                      className={cn(
+                        "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                        selectedPose === pose.id
+                          ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
+                          : "border-transparent hover:border-rose-500/50"
+                      )}
+                    >
+                      <img
+                        src={pose.image}
+                        alt={pose.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
+                        {pose.name}
+                      </span>
+                      {selectedPose === pose.id && (
+                        <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => goToStep("background")}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <Button
+                    onClick={() => goToStep("photo")}
+                    disabled={!selectedPose}
+                    className="bg-rose-500 hover:bg-rose-600"
+                  >
+                    Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 3: Seleccionar Foto de Referencia */}
+            {step === "photo" && (
+              <motion.div
+                key="photo"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-rose-400" />
+                  Selecciona tu foto de referencia
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Estas son las fotos que subiste durante el entrenamiento
+                </p>
+                {trainingPhotos.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No tienes fotos de entrenamiento explícitas disponibles
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto">
+                    {trainingPhotos.map((photo, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedPhoto(photo)}
+                        className={cn(
+                          "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                          selectedPhoto === photo
+                            ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
+                            : "border-transparent hover:border-rose-500/50"
+                        )}
+                      >
+                        <img
+                          src={photo}
+                          alt={`Foto ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedPhoto === photo && (
+                          <div className="absolute inset-0 bg-rose-500/20 flex items-center justify-center">
+                            <div className="bg-rose-500 rounded-full p-2">
+                              <Check className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => goToStep("pose")}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <Button
+                    onClick={() => goToStep("confirm")}
+                    disabled={!selectedPhoto}
+                    className="bg-rose-500 hover:bg-rose-600"
+                  >
+                    Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 4: Confirmar y Generar */}
+            {step === "confirm" && (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-rose-400" />
+                  Confirma tu selección
+                </h3>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Fondo */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">Fondo</p>
+                    <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30">
+                      <img
+                        src={BACKGROUNDS.find(b => b.id === selectedBackground)?.image}
+                        alt="Fondo seleccionado"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-center text-rose-300">
+                      {BACKGROUNDS.find(b => b.id === selectedBackground)?.name}
+                    </p>
+                  </div>
+                  
+                  {/* Pose */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">Pose</p>
+                    <div className="aspect-square rounded-lg overflow-hidden border border-rose-500/30">
+                      <img
+                        src={POSES.find(p => p.id === selectedPose)?.image}
+                        alt="Pose seleccionada"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-center text-rose-300">
+                      {POSES.find(p => p.id === selectedPose)?.name}
+                    </p>
+                  </div>
+                  
+                  {/* Foto */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">Tu foto</p>
+                    <div className="aspect-square rounded-lg overflow-hidden border border-rose-500/30">
+                      <img
+                        src={selectedPhoto || ""}
+                        alt="Foto seleccionada"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-xs text-center text-rose-300">Referencia</p>
+                  </div>
+                </div>
+
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    className="rounded-lg bg-destructive/10 p-4 text-center text-destructive"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+
+                <div className="flex justify-between pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => goToStep("photo")}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !canGenerate || (!user?.isUnlimited && remainingCredits <= 0)}
+                    isLoading={isGenerating}
+                    className="bg-gradient-to-r from-rose-500 to-purple-500 hover:from-rose-600 hover:to-purple-600"
+                  >
+                    {!isGenerating && <Sparkles className="h-5 w-5 mr-2" />}
+                    {isGenerating ? "Generando..." : "Generar Imagen"}
+                  </Button>
+                </div>
+
+                {!user?.isUnlimited && remainingCredits <= 0 && (
+                  <p className="text-center text-sm text-destructive">
+                    No tienes créditos disponibles. Contacta al administrador.
+                  </p>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
