@@ -25,9 +25,9 @@ export interface GenerationRequest {
 }
 
 export interface ExplicitGenerationRequest {
-  background_url: string;  // URL de la imagen de fondo (piscina, cocina, etc.)
-  pose_url: string;  // URL de la imagen de pose
-  reference_url: string;  // URL de la foto de referencia de la modelo
+  background_b64: string;  // Base64 de la imagen de fondo (piscina, cocina, etc.)
+  pose_b64: string;  // Base64 de la imagen de pose
+  reference_url: string;  // URL de la foto de referencia de la modelo (ya está en servidor)
   additional_prompt?: string;  // Instrucciones adicionales opcionales
   width?: number;
   height?: number;

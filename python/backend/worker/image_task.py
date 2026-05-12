@@ -169,8 +169,8 @@ def generate_image_task(
 def generate_explicit_image_task(
     self,
     *,
-    background_url: str,
-    pose_url: str,
+    background_b64: str,
+    pose_b64: str,
     reference_url: str,
     additional_prompt: str = "",
     width: int = 1024,
@@ -179,16 +179,16 @@ def generate_explicit_image_task(
 ) -> dict:
     """
     Genera una imagen explícita usando 3 imágenes de referencia:
-    - background_url: Fondo/escenario
-    - pose_url: Pose a replicar
-    - reference_url: Foto de la modelo
+    - background_b64: Base64 del fondo/escenario (ya convertido en frontend)
+    - pose_b64: Base64 de la pose a replicar (ya convertido en frontend)
+    - reference_url: URL de la foto de la modelo (se resuelve aquí)
     
     Utiliza un prompt maestro para instruir al modelo sobre cómo combinar las 3 imágenes.
     """
     try:
         logger.info(
-            "Starting explicit image generation: user=%s bg=%s pose=%s ref=%s",
-            user_id, background_url[:50], pose_url[:50], reference_url[:50]
+            "Starting explicit image generation: user=%s bg_b64_len=%d pose_b64_len=%d ref=%s",
+            user_id, len(background_b64), len(pose_b64), reference_url[:50]
         )
         
         # Construir el prompt final con instrucciones adicionales si las hay
@@ -198,13 +198,14 @@ def generate_explicit_image_task(
         
         final_prompt = EXPLICIT_MASTER_PROMPT.format(additional_instructions=additional_instructions)
         
-        # Resolver las 3 URLs a base64
-        # El orden es importante: background, pose, reference
-        all_urls = [background_url, pose_url, reference_url]
-        resolved_refs = _resolve_reference_urls(all_urls)
+        # Fondo y pose ya vienen en base64, solo resolver la URL de referencia
+        reference_b64_list = _resolve_reference_urls([reference_url])
         
-        if len(resolved_refs) < 3:
-            raise ValueError(f"No se pudieron resolver todas las imágenes. Resueltas: {len(resolved_refs)}/3")
+        if not reference_b64_list:
+            raise ValueError("No se pudo resolver la imagen de referencia de la modelo")
+        
+        # Combinar las 3 imágenes en base64: background, pose, reference
+        resolved_refs = [background_b64, pose_b64, reference_b64_list[0]]
         
         # Usar el modelo de Image2Image más potente
         selected_model = list(IMAGE2IMAGE_MODELS)[0] if IMAGE2IMAGE_MODELS else "wan2.7-image-pro"

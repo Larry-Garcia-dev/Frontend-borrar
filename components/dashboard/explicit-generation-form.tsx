@@ -37,6 +37,23 @@ const POSES = [
 
 type Step = "background" | "pose" | "photo" | "confirm";
 
+// Función para convertir una imagen URL a base64
+async function imageUrlToBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      // Remover el prefijo "data:image/...;base64," para obtener solo el base64
+      const base64Data = base64.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 interface ExplicitGenerationFormProps {
   onGenerateStart: () => void;
   modelProfile: ModelProfile;
@@ -73,7 +90,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
     onGenerateStart();
 
     try {
-      // Obtener las URLs completas de las imágenes
+      // Obtener los datos de las imágenes
       const background = BACKGROUNDS.find(b => b.id === selectedBackground);
       const pose = POSES.find(p => p.id === selectedPose);
       
@@ -81,22 +98,22 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         throw new Error("Fondo o pose no encontrados");
       }
 
-      // Construir URLs absolutas para fondo y pose (assets locales)
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      const backgroundUrl = `${baseUrl}${background.image}`;
-      const poseUrl = `${baseUrl}${pose.image}`;
+      // Convertir imágenes locales a base64
+      const [backgroundB64, poseB64] = await Promise.all([
+        imageUrlToBase64(background.image),
+        imageUrlToBase64(pose.image),
+      ]);
 
-      // Llamar al endpoint de generación explícita
+      // Llamar al endpoint de generación explícita con base64
       const result = await api.generateExplicitImage({
-        background_url: backgroundUrl,
-        pose_url: poseUrl,
+        background_b64: backgroundB64,
+        pose_b64: poseB64,
         reference_url: selectedPhoto,
         additional_prompt: `${background.name} setting, ${pose.name} pose`,
         width: 1024,
         height: 1024,
       });
 
-      // La imagen se generó correctamente, el store se actualizará automáticamente
       console.log("[v0] Explicit generation completed:", result);
     } catch (err: any) {
       console.error("[v0] Explicit generation error:", err);
