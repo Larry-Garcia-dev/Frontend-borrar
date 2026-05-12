@@ -31,6 +31,8 @@ def format_profile_response(profile: ModelProfile) -> ModelProfileResponse:
         eye_color=profile.eye_color,
         height_cm=profile.height_cm,
         training_photos=profile.training_photos or [],
+        is_explicit=profile.is_explicit,
+        explicit_training_photos=profile.explicit_training_photos or [],
         ai_model_id=profile.ai_model_id,
         status=profile.status.value if hasattr(profile.status, "value") else str(profile.status),
         rejection_reason=profile.rejection_reason,
@@ -46,6 +48,8 @@ def format_request_response(req: ModelCreationRequest) -> ModelCreationRequestRe
         model_name=req.model_name,
         model_phone=req.model_phone,
         training_photos=req.training_photos or [],
+        is_explicit=req.is_explicit,
+        explicit_training_photos=req.explicit_training_photos or [],
         model_info=req.model_info,
         status=req.status,
         payment_required=req.payment_required,
@@ -64,6 +68,14 @@ def create_model_request(db: Session, current_user_id: str, data: CreateModelReq
     existing = db.query(User).filter(User.email == data.model_email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Este email ya está registrado")
+    
+    # Validar fotos de entrenamiento
+    if len(data.training_photos) < 5:
+        raise HTTPException(status_code=400, detail="Se requieren al menos 5 fotos de entrenamiento")
+    
+    # Validar fotos explícitas si aplica
+    if data.is_explicit and len(data.explicit_training_photos) < 8:
+        raise HTTPException(status_code=400, detail="Se requieren 8 fotos explícitas cuando is_explicit es True")
     
     # 1. VALIDACIÓN ESTRICTA DE CRÉDITOS
     assigned_limit = int(data.model_info.get("assigned_daily_limit", 10)) if data.model_info else 10
@@ -96,6 +108,8 @@ def create_model_request(db: Session, current_user_id: str, data: CreateModelReq
         model_name=data.model_name,
         model_phone=data.model_phone,
         training_photos=data.training_photos,
+        is_explicit=data.is_explicit,
+        explicit_training_photos=data.explicit_training_photos if data.is_explicit else [],
         model_info=data.model_info,
         payment_required=True,
         payment_amount_usd=50.00,
@@ -214,6 +228,8 @@ def approve_model_request_service(db: Session, admin_id: str, request_id: str):
         studio_id=request.studio_id,
         display_name=request.model_name,
         training_photos=request.training_photos,
+        is_explicit=request.is_explicit,
+        explicit_training_photos=request.explicit_training_photos if request.is_explicit else [],
         images_per_order=assigned_limit, # <-- Se asignan al Perfil
         status=ModelProfileStatus.APPROVED,
     )

@@ -74,6 +74,11 @@ class ModelProfile(Base):
     training_photos: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
     # Example: ["url1", "url2", ...]
     
+    # Explicit content flag and photos
+    is_explicit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    explicit_training_photos: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
+    # Example: ["url1", "url2", ...] - 8 explicit photos required if is_explicit=True
+    
     # AI Training info
     ai_model_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     training_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -130,6 +135,10 @@ class ModelCreationRequest(Base):
     
     # Training photos (URLs stored as JSON array)
     training_photos: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
+    
+    # Explicit content flag and photos
+    is_explicit: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    explicit_training_photos: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
     
     # Physical characteristics
     model_info: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)

@@ -71,11 +71,11 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
         model_name: formData.model_name,
         model_phone: formData.model_phone || undefined,
         training_photos: urls,
+        is_explicit: isExplicit,
+        explicit_training_photos: explicitUrls,
         model_info: {
           ...formData,
           assigned_daily_limit: formData.assigned_credits,
-          is_explicit: isExplicit,
-          explicit_training_photos: explicitUrls,
         },
       });
 

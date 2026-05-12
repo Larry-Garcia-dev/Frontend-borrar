@@ -18,7 +18,9 @@ class CreateModelRequest(BaseModel):
     model_name: str
     model_phone: Optional[str] = None
     model_info: Optional[dict] = None
-    training_photos: List[str] = []  # URLs of uploaded photos
+    training_photos: List[str] = []  # URLs of uploaded photos (min 5)
+    is_explicit: bool = False  # Flag for explicit content
+    explicit_training_photos: List[str] = []  # URLs of explicit photos (8 required if is_explicit=True)
 
 class ModelProfileResponse(BaseModel):
     """Model profile response."""
@@ -34,6 +36,8 @@ class ModelProfileResponse(BaseModel):
     eye_color: Optional[str] = None
     height_cm: Optional[int] = None
     training_photos: List[str] = []
+    is_explicit: bool = False
+    explicit_training_photos: List[str] = []
     ai_model_id: Optional[str] = None
     status: str
     rejection_reason: Optional[str] = None
@@ -51,6 +55,8 @@ class ModelCreationRequestResponse(BaseModel):
     model_name: str
     model_phone: Optional[str] = None
     training_photos: List[str] = []
+    is_explicit: bool = False
+    explicit_training_photos: List[str] = []
     model_info: Optional[dict] = None
     status: str
     payment_required: bool
