@@ -202,6 +202,8 @@ export interface ModelProfile {
   eye_color?: string;
   height_cm?: number;
   training_photos: string[];
+  is_explicit: boolean;
+  explicit_training_photos: string[];
   ai_model_id?: string;
   status: string;
   rejection_reason?: string;
@@ -216,6 +218,8 @@ export interface ModelCreationRequest {
   model_name: string;
   model_phone?: string;
   training_photos: string[];
+  is_explicit: boolean;
+  explicit_training_photos: string[];
   model_info?: Record<string, unknown>;
   status: string;
   payment_required: boolean;
@@ -231,6 +235,8 @@ export interface CreateModelRequestData {
   model_phone?: string;
   model_info?: Record<string, unknown>;
   training_photos: string[];
+  is_explicit?: boolean;
+  explicit_training_photos?: string[];
 }
 
 export interface BillingRecord {
