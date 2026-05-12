@@ -104,9 +104,15 @@ class AlibabaImageMixin:
             content = []
             
             # NUEVO COMPORTAMIENTO: Iteramos la lista de referencias
+            # Las imágenes base64 deben tener el prefijo data:image para ser reconocidas
             if ref_images_b64:
                 for img_b64 in ref_images_b64:
-                    content.append({"image": img_b64})
+                    # Si ya tiene prefijo data: usamos tal cual, si no lo agregamos
+                    if img_b64.startswith("data:"):
+                        content.append({"image": img_b64})
+                    else:
+                        # Agregar prefijo data URI para que DashScope reconozca como inline data
+                        content.append({"image": f"data:image/jpeg;base64,{img_b64}"})
                     
             content.append({"text": prompt})
             
