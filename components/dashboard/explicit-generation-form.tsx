@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { api } from "@/lib/api-client";
@@ -70,6 +71,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
   const [selectedPose, setSelectedPose] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [additionalPrompt, setAdditionalPrompt] = useState<string>("");
 
   const trainingPhotos = modelProfile.explicit_training_photos || [];
   
@@ -104,12 +106,17 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         imageUrlToBase64(pose.image),
       ]);
 
+      // Construir prompt combinado
+      const fullPrompt = additionalPrompt.trim()
+        ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
+        : `${background.name} setting, ${pose.name} pose`;
+
       // Llamar al endpoint de generación explícita con base64
       const result = await api.generateExplicitImage({
         background_b64: backgroundB64,
         pose_b64: poseB64,
         reference_url: selectedPhoto,
-        additional_prompt: `${background.name} setting, ${pose.name} pose`,
+        additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
       });
@@ -431,6 +438,23 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                     </div>
                     <p className="text-xs text-center text-rose-300">Referencia</p>
                   </div>
+                </div>
+
+                {/* Input de Prompt Adicional */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Instrucciones adicionales (opcional)
+                  </label>
+                  <Textarea
+                    value={additionalPrompt}
+                    onChange={(e) => setAdditionalPrompt(e.target.value)}
+                    placeholder="Describe detalles adicionales: iluminación, ambiente, accesorios, etc."
+                    className="min-h-[80px] bg-background/50 border-rose-500/20 focus:border-rose-500/50 resize-none"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {additionalPrompt.length}/500 caracteres
+                  </p>
                 </div>
 
                 {(error || explicitError) && (
