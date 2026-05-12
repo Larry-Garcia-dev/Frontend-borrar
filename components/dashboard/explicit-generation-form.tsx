@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { api } from "@/lib/api-client";
 import { ModelProfile } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -63,8 +62,7 @@ interface ExplicitGenerationFormProps {
 export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: ExplicitGenerationFormProps) {
   const { user } = useAuthStore();
   const {
-    isGenerating, error, generate, clearError,
-    setPrompt, setReferenceImageUrls,
+    isGenerating, error, clearError, generateExplicit,
   } = useGenerationStore();
 
   const [step, setStep] = useState<Step>("background");
@@ -81,14 +79,10 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
   const canGenerate = selectedBackground && selectedPose && selectedPhoto;
 
-  const [isGeneratingExplicit, setIsGeneratingExplicit] = useState(false);
-  const [explicitError, setExplicitError] = useState<string | null>(null);
-
   const handleGenerate = async () => {
     if (!canGenerate || !selectedBackground || !selectedPose || !selectedPhoto) return;
     
-    setExplicitError(null);
-    setIsGeneratingExplicit(true);
+    clearError();
     onGenerateStart();
 
     try {
@@ -111,8 +105,8 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
         : `${background.name} setting, ${pose.name} pose`;
 
-      // Llamar al endpoint de generación explícita con base64
-      const result = await api.generateExplicitImage({
+      // Usar el store para la generación - esto actualiza isGenerating y currentGeneration
+      await generateExplicit({
         background_b64: backgroundB64,
         pose_b64: poseB64,
         reference_url: selectedPhoto,
@@ -120,13 +114,8 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         width: 1024,
         height: 1024,
       });
-
-      console.log("[v0] Explicit generation completed:", result);
     } catch (err: any) {
       console.error("[v0] Explicit generation error:", err);
-      setExplicitError(err.message || "Error al generar la imagen");
-    } finally {
-      setIsGeneratingExplicit(false);
     }
   };
 
@@ -457,13 +446,13 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   </p>
                 </div>
 
-                {(error || explicitError) && (
+                {error && (
                   <motion.div 
                     initial={{ opacity: 0, y: -10 }} 
                     animate={{ opacity: 1, y: 0 }} 
                     className="rounded-lg bg-destructive/10 p-4 text-center text-destructive"
                   >
-                    {explicitError || error}
+                    {error}
                   </motion.div>
                 )}
 
@@ -471,15 +460,16 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   <Button
                     variant="outline"
                     onClick={() => goToStep("photo")}
+                    disabled={isGenerating}
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                   </Button>
                   <Button
                     onClick={handleGenerate}
-                    disabled={isGeneratingExplicit || !canGenerate || (!user?.isUnlimited && remainingCredits <= 0)}
+                    disabled={isGenerating || !canGenerate || (!user?.isUnlimited && remainingCredits <= 0)}
                     className="bg-gradient-to-r from-rose-500 to-purple-500 hover:from-rose-600 hover:to-purple-600"
                   >
-                    {isGeneratingExplicit ? (
+                    {isGenerating ? (
                       <span className="flex items-center">
                         <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
