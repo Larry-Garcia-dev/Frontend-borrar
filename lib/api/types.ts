@@ -24,6 +24,15 @@ export interface GenerationRequest {
   parent_media_id?: string;
 }
 
+export interface ExplicitGenerationRequest {
+  background_url: string;  // URL de la imagen de fondo (piscina, cocina, etc.)
+  pose_url: string;  // URL de la imagen de pose
+  reference_url: string;  // URL de la foto de referencia de la modelo
+  additional_prompt?: string;  // Instrucciones adicionales opcionales
+  width?: number;
+  height?: number;
+}
+
 export interface GenerationTaskResponse {
   task_id: string;
   status: string;
