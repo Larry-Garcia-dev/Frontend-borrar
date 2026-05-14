@@ -32,6 +32,7 @@ interface GenerationState {
   parentMediaId: string | null;
   parentEditCount: number;
   selectedSize: string;
+  isExplicitMode: boolean;
 
   // Actions
   setPrompt: (prompt: string) => void;
@@ -46,6 +47,7 @@ interface GenerationState {
   setParentMediaId: (id: string | null) => void;
   setParentEditCount: (count: number) => void;
   setSelectedSize: (size: string) => void;
+  setIsExplicitMode: (mode: boolean) => void;
   startEdit: (mediaId: string, editCount: number) => void;
   cancelEdit: () => void;
   reportMedia: (mediaId: string, reason: string) => Promise<void>;
@@ -85,6 +87,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   parentMediaId: null,
   parentEditCount: 0,
   selectedSize: "1080x1080 (1:1)",
+  isExplicitMode: false,
 
   setPrompt: (prompt) => set({ prompt }),
   setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
@@ -98,6 +101,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   setParentMediaId: (id) => set({ parentMediaId: id }),
   setParentEditCount: (count) => set({ parentEditCount: count }),
   setSelectedSize: (size) => set({ selectedSize: size }),
+  setIsExplicitMode: (mode) => set({ isExplicitMode: mode }),
   startEdit: (mediaId, editCount) => set({ parentMediaId: mediaId, parentEditCount: editCount }),
   cancelEdit: () => set({ parentMediaId: null, parentEditCount: 0 }),
   reportMedia: async (mediaId, reason) => {

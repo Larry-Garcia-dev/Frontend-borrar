@@ -33,9 +33,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     promptTemplates, templateId, setTemplateId,
     referenceImageUrls, setReferenceImageUrls, uploadReferenceImages,
     parentMediaId, parentEditCount, cancelEdit,
+    isExplicitMode, setIsExplicitMode,
   } = useGenerationStore();
-  
-  const [isExplicitMode, setIsExplicitMode] = useState(false);
   const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   

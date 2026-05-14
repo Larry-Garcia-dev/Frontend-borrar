@@ -34,7 +34,8 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     width, 
     height, 
     approveMedia,
-    generateEdit
+    generateEdit,
+    isExplicitMode
   } = useGenerationStore();
 
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
@@ -295,6 +296,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
           image={currentGeneration}
           onGenerate={handleGenerateEdit}
           maxEdits={2}
+          isExplicit={isExplicitMode}
         />
       )}
     </>
