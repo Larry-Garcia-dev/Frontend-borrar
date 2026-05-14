@@ -1,12 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, RefreshCw, Image as ImageIcon, Flag, Edit3, Check, AlertTriangle } from "lucide-react";
+import { 
+  Download, 
+  RefreshCw, 
+  Image as ImageIcon, 
+  Flag, 
+  Check, 
+  AlertTriangle,
+  Copy,
+  ChevronDown,
+  Info
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ParticleLoader } from "@/components/ui/particle-loader";
 import { ProtectedImage } from "@/components/protected-image";
+import { EditOptionsPanel } from "./edit-options-panel";
 import { useGenerationStore } from "@/lib/store/generation-store";
+import { cn } from "@/lib/utils";
 
 interface GenerationResultProps {
   onOpenReport: (mediaId: string) => void;
@@ -15,9 +27,21 @@ interface GenerationResultProps {
 
 export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResultProps) {
   const { 
-    isGenerating, progress, currentGeneration, 
-    width, height, startEdit, setPrompt, generations, approveMedia 
+    isGenerating, 
+    progress, 
+    currentGeneration, 
+    width, 
+    height, 
+    startEdit, 
+    setPrompt, 
+    prompt,
+    generations, 
+    approveMedia 
   } = useGenerationStore();
+
+  const [isEditExpanded, setIsEditExpanded] = useState(true);
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   const isApproved = currentGeneration?.is_approved || false;
 
@@ -29,9 +53,28 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     link.click();
   };
 
-  // Función restaurada para manejar la edición
+  const handleCopyPrompt = () => {
+    if (currentGeneration?.prompt) {
+      navigator.clipboard.writeText(currentGeneration.prompt);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    }
+  };
+
+  // Función para agregar prompt de edición
+  const handleEditOption = (promptToAdd: string) => {
+    const media = currentGeneration;
+    if (media) {
+      // Construir el nuevo prompt combinando el original con la edición
+      const basePrompt = `Editar imagen: ${media.prompt}`;
+      const newPrompt = `${basePrompt}\n\nInstrucciones adicionales: ${promptToAdd}`;
+      setPrompt(newPrompt);
+      startEdit(media.id, media.edit_count);
+    }
+  };
+
+  // Función para manejar edición manual (sin opciones predefinidas)
   const handleStartEdit = (mediaId: string, editCount: number) => {
-    // Buscamos en la galería o usamos la generación actual
     const media = generations.find((g) => g.id === mediaId) || currentGeneration;
     if (media) {
       setPrompt(`Editar: ${media.prompt}`);
@@ -39,21 +82,65 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     }
   };
 
+  // Estado vacío - sin generación
+  if (!isGenerating && !currentGeneration) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }} 
+        animate={{ opacity: 1, x: 0 }} 
+        transition={{ delay: 0.2 }} 
+        className="w-full lg:w-1/2"
+      >
+        <div className="flex h-full min-h-[500px] items-center justify-center rounded-2xl border border-border bg-card/50">
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20">
+              <ImageIcon className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground">Tu imagen aparecerá aquí</h3>
+            <p className="mt-2 text-muted-foreground">Escribe un prompt y presiona generar</p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Estado de carga
+  if (isGenerating && !currentGeneration) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }} 
+        animate={{ opacity: 1, x: 0 }} 
+        transition={{ delay: 0.2 }} 
+        className="w-full lg:w-1/2"
+      >
+        <div className="flex h-full min-h-[500px] items-center justify-center rounded-2xl border border-border bg-card/50">
+          <ParticleLoader message="Creando tu imagen..." progress={progress} />
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Vista con imagen generada - Layout de 2 columnas
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="w-full lg:w-1/2">
-      <Card className="h-full">
-        <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
-          <CardTitle className="text-lg sm:text-2xl">Resultado</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 sm:px-6">
-          <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-secondary/50">
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      transition={{ delay: 0.2 }} 
+      className="w-full lg:w-1/2"
+    >
+      <div className="flex flex-col lg:flex-row gap-4 h-full">
+        {/* Columna izquierda - Imagen (70%) */}
+        <div className="lg:w-[65%] flex flex-col">
+          <div className="relative flex-1 overflow-hidden rounded-2xl border border-border bg-secondary/30">
             <AnimatePresence mode="wait">
-              {isGenerating ? (
-                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full items-center justify-center">
-                  <ParticleLoader message="Creando tu imagen..." progress={progress} />
-                </motion.div>
-              ) : currentGeneration ? (
-                <motion.div key="result" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative h-full">
+              {currentGeneration && (
+                <motion.div 
+                  key="result" 
+                  initial={{ opacity: 0, scale: 0.95 }} 
+                  animate={{ opacity: 1, scale: 1 }} 
+                  exit={{ opacity: 0, scale: 0.95 }} 
+                  className="relative h-full min-h-[400px] lg:min-h-[500px]"
+                >
                   <ProtectedImage
                     src={currentGeneration.storage_url}
                     alt={currentGeneration.prompt}
@@ -61,78 +148,157 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                     isApproved={isApproved}
                   />
                 </motion.div>
-              ) : (
-                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20">
-                    <ImageIcon className="h-10 w-10 text-primary" />
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Columna derecha - Panel de información (35%) */}
+        <div className="lg:w-[35%] flex flex-col gap-4">
+          {/* Sección PROMPT */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground tracking-wider">PROMPT</span>
+              <button
+                onClick={handleCopyPrompt}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {copiedPrompt ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    Copiar
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed line-clamp-4">
+              {currentGeneration?.prompt}
+            </p>
+          </div>
+
+          {/* Sección INFORMACIÓN */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <button
+              onClick={() => setIsInfoExpanded(!isInfoExpanded)}
+              className="flex w-full items-center justify-between text-xs font-medium text-muted-foreground tracking-wider hover:text-foreground transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                INFORMACIÓN
+              </span>
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform",
+                isInfoExpanded && "rotate-180"
+              )} />
+            </button>
+            
+            <AnimatePresence>
+              {isInfoExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Modelo</span>
+                      <span className="text-sm font-medium text-foreground">Macondo AI</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Calidad</span>
+                      <span className="text-sm font-medium text-primary">1k</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Tamaño</span>
+                      <span className="text-sm font-medium text-foreground">{width}x{height}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Ediciones</span>
+                      <span className="text-sm font-medium text-foreground">{currentGeneration?.edit_count || 0}</span>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-semibold text-foreground">Tu imagen aparecerá aquí</h3>
-                  <p className="mt-2 text-muted-foreground">Escribe un prompt y presiona generar</p>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {currentGeneration && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 space-y-4">
-              
-              {!isApproved ? (
-                <div className="rounded-xl bg-amber-500/10 p-4 border border-amber-500/20">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500 shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">Imagen protegida</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Debes aprobarla para descargarla. También puedes editarla o reportarla si hay un error.
-                      </p>
-                      
-                      {/* AQUÍ ESTÁN RESTAURADOS LOS 3 BOTONES ORIGINALES */}
-                      <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-                        <Button variant="default" size="sm" onClick={() => approveMedia(currentGeneration.id)} className="text-xs sm:text-sm">
-                          <Check className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="hidden xs:inline">Aprobar</span>
-                          <span className="xs:hidden">OK</span>
-                        </Button>
-                        
-                        <Button variant="secondary" size="sm" className="text-xs sm:text-sm" onClick={() => handleStartEdit(currentGeneration.id, currentGeneration.edit_count)}>
-                          <Edit3 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                          Editar
-                        </Button>
+          {/* Sección EDICIÓN RÁPIDA - Solo si NO está aprobada */}
+          {!isApproved && currentGeneration && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <EditOptionsPanel
+                onSelectOption={handleEditOption}
+                isExpanded={isEditExpanded}
+                onToggleExpand={() => setIsEditExpanded(!isEditExpanded)}
+              />
+            </div>
+          )}
 
-                        <Button variant="destructive" size="sm" className="text-xs sm:text-sm" onClick={() => onOpenReport(currentGeneration.id)}>
-                          <Flag className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                          Reportar
-                        </Button>
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Button variant="gradient" className="flex-1" onClick={handleDownload}>
-                    <Download className="mr-2 h-4 w-4" /> Descargar Imagen
-                  </Button>
-                  <Button variant="secondary" onClick={onGenerateNew} disabled={isGenerating}>
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              {/* Generation info */}
-              <div className="rounded-xl bg-secondary/50 p-4">
-                <p className="text-sm text-muted-foreground">Prompt utilizado:</p>
-                <p className="mt-1 text-base text-foreground">{currentGeneration.prompt}</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-md bg-background px-2 py-1">{width}x{height}</span>
-                  <span className="rounded-md bg-background px-2 py-1">Ediciones: {currentGeneration.edit_count}</span>
+          {/* Advertencia de imagen protegida */}
+          {!isApproved && currentGeneration && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-foreground text-sm">Imagen protegida</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Aprueba para descargar o reporta si hay errores
+                  </p>
                 </div>
               </div>
-
-            </motion.div>
+            </div>
           )}
-        </CardContent>
-      </Card>
+
+          {/* Sección ACCIONES */}
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            {!isApproved ? (
+              <>
+                <Button 
+                  variant="default" 
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                  onClick={() => currentGeneration && approveMedia(currentGeneration.id)}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Aprobar imagen
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => currentGeneration && onOpenReport(currentGeneration.id)}
+                >
+                  <Flag className="mr-2 h-4 w-4" />
+                  Reportar problema
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="gradient" 
+                  className="w-full"
+                  onClick={handleDownload}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar imagen
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={onGenerateNew}
+                  disabled={isGenerating}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Nueva generación
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
