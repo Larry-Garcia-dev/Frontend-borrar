@@ -52,7 +52,7 @@ interface GenerationState {
   cancelEdit: () => void;
   reportMedia: (mediaId: string, reason: string) => Promise<void>;
   approveMedia: (mediaId: string) => Promise<void>;
-  generateEdit: (mediaId: string, hiddenPrompt: string, clothingText: string, width: number, height: number) => Promise<GeneratedMedia | null>;
+  generateEdit: (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => Promise<GeneratedMedia | null>;
 
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
@@ -109,7 +109,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   // Generar edición con prompt oculto (el usuario no ve el prompt interno)
-  generateEdit: async (mediaId: string, hiddenPrompt: string, clothingText: string, width: number, height: number) => {
+  generateEdit: async (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => {
     const state = get();
     const media = state.generations.find(g => g.id === mediaId) || state.currentGeneration;
     
@@ -144,8 +144,9 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         fullPrompt += `. Change clothing to: ${clothingText.trim()}`;
       }
 
-      const request = {
+      const request: GenerationRequest = {
         prompt: fullPrompt,
+        negative_prompt: negativePrompt || undefined,
         width,
         height,
         media_type: "image",
