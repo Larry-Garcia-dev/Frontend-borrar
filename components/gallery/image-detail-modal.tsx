@@ -24,8 +24,8 @@ export function ImageDetailModal({ image, onClose, onApprove, onReport, onDownlo
 
   if (!image) return null;
 
-  const handleGenerateEdit = async (hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => {
-    await generateEdit(image.id, hiddenPrompt, negativePrompt, clothingText, width, height);
+  const handleGenerateEdit = async (hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number) => {
+    await generateEdit(image.id, hiddenPrompt, negativePrompt, clothingText, customPrompt, width, height, numImages);
     setShowEditModal(false);
     onClose();
   };

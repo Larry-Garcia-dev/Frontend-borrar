@@ -60,9 +60,9 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     }
   };
 
-  const handleGenerateEdit = async (hiddenPrompt: string, negativePrompt: string, clothingText: string, newWidth: number, newHeight: number) => {
+  const handleGenerateEdit = async (hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, newWidth: number, newHeight: number, numImages: number) => {
     if (!currentGeneration) return;
-    await generateEdit(currentGeneration.id, hiddenPrompt, negativePrompt, clothingText, newWidth, newHeight);
+    await generateEdit(currentGeneration.id, hiddenPrompt, negativePrompt, clothingText, customPrompt, newWidth, newHeight, numImages);
   };
 
   // Estado vacío - sin generación
