@@ -50,6 +50,7 @@ interface GenerationState {
   cancelEdit: () => void;
   reportMedia: (mediaId: string, reason: string) => Promise<void>;
   approveMedia: (mediaId: string) => Promise<void>;
+  generateEdit: (mediaId: string, hiddenPrompt: string, clothingText: string, width: number, height: number) => Promise<GeneratedMedia | null>;
 
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
@@ -101,6 +102,97 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   cancelEdit: () => set({ parentMediaId: null, parentEditCount: 0 }),
   reportMedia: async (mediaId, reason) => {
     await api.reportMedia(mediaId, reason);
+  },
+
+  // Generar edición con prompt oculto (el usuario no ve el prompt interno)
+  generateEdit: async (mediaId: string, hiddenPrompt: string, clothingText: string, width: number, height: number) => {
+    const state = get();
+    const media = state.generations.find(g => g.id === mediaId) || state.currentGeneration;
+    
+    if (!media) {
+      set({ error: "No se encontró la imagen para editar" });
+      return null;
+    }
+
+    // Verificar límite de ediciones (máximo 2)
+    if ((media.edit_count || 0) >= 2) {
+      set({ error: "Has alcanzado el límite de ediciones para esta imagen" });
+      return null;
+    }
+
+    set({
+      isGenerating: true,
+      error: null,
+      progress: 0,
+      taskStatus: "queued",
+      currentGeneration: null,
+    });
+
+    try {
+      // Construir prompt combinado (oculto para el usuario)
+      let fullPrompt = `Edit image based on: ${media.prompt}`;
+      
+      if (hiddenPrompt) {
+        fullPrompt += `. ${hiddenPrompt}`;
+      }
+      
+      if (clothingText.trim()) {
+        fullPrompt += `. Change clothing to: ${clothingText.trim()}`;
+      }
+
+      const request = {
+        prompt: fullPrompt,
+        width,
+        height,
+        media_type: "image",
+        parent_media_id: mediaId,
+      };
+
+      const task = await api.createGeneration(request);
+      set({ taskId: task.task_id, taskStatus: task.status });
+
+      const result = await api.waitForGeneration(
+        task.task_id,
+        (status) => {
+          set({ taskStatus: status });
+          if (status === "pending" || status === "queued") {
+            set({ progress: 10 });
+          } else if (status === "started") {
+            set({ progress: 30 });
+          } else if (status === "progress") {
+            set((s) => ({ progress: Math.min(s.progress + 10, 90) }));
+          }
+        }
+      );
+
+      if (result) {
+        const resolvedResult = {
+          ...result,
+          storage_url: resolveMediaUrl(result.storage_url),
+        };
+        set({
+          currentGeneration: resolvedResult,
+          generations: [resolvedResult, ...get().generations],
+          isGenerating: false,
+          progress: 100,
+          taskStatus: "success",
+          parentMediaId: null,
+          parentEditCount: 0,
+        });
+        return resolvedResult;
+      }
+
+      set({ isGenerating: false, progress: 0, taskStatus: "" });
+      return null;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al generar edición",
+        isGenerating: false,
+        progress: 0,
+        taskStatus: "failure",
+      });
+      return null;
+    }
   },
 
   generate: async () => {

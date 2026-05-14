@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { GeneratedMedia } from "@/lib/api-client";
@@ -13,8 +12,7 @@ import { ImageDetailModal } from "@/components/gallery/image-detail-modal";
 import { ReportModal } from "@/components/gallery/report-modal";
 
 export default function GalleryPage() {
-  const router = useRouter();
-  const { generations, fetchGenerations, isLoading, startEdit, setPrompt, approveMedia } = useGenerationStore();
+  const { generations, fetchGenerations, isLoading, approveMedia } = useGenerationStore();
   
   // Estados Locales
   const [selectedImage, setSelectedImage] = useState<GeneratedMedia | null>(null);
@@ -37,12 +35,6 @@ export default function GalleryPage() {
     });
 
   // Manejadores de Eventos
-  const handleEdit = (image: GeneratedMedia) => {
-    setPrompt(`Editar: ${image.prompt}`);
-    startEdit(image.id, image.edit_count);
-    router.push("/dashboard");
-  };
-
   const handleOpenReport = (id: string) => {
     setReportingMediaId(id);
     setShowReportModal(true);
@@ -91,7 +83,6 @@ export default function GalleryPage() {
         image={selectedImage} 
         onClose={() => setSelectedImage(null)} 
         onApprove={handleApprove}
-        onEdit={handleEdit}
         onReport={handleOpenReport}
         onDownload={handleDownload}
       />
