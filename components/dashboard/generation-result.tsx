@@ -11,12 +11,13 @@ import {
   AlertTriangle,
   Copy,
   ChevronDown,
-  Info
+  Info,
+  Edit3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ParticleLoader } from "@/components/ui/particle-loader";
 import { ProtectedImage } from "@/components/protected-image";
-import { EditOptionsPanel } from "./edit-options-panel";
+import { EditModal } from "./edit-modal";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { cn } from "@/lib/utils";
 
@@ -32,16 +33,13 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     currentGeneration, 
     width, 
     height, 
-    startEdit, 
-    setPrompt, 
-    prompt,
-    generations, 
-    approveMedia 
+    approveMedia,
+    generateEdit
   } = useGenerationStore();
 
-  const [isEditExpanded, setIsEditExpanded] = useState(true);
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const isApproved = currentGeneration?.is_approved || false;
 
@@ -61,25 +59,9 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     }
   };
 
-  // Función para agregar prompt de edición
-  const handleEditOption = (promptToAdd: string) => {
-    const media = currentGeneration;
-    if (media) {
-      // Construir el nuevo prompt combinando el original con la edición
-      const basePrompt = `Editar imagen: ${media.prompt}`;
-      const newPrompt = `${basePrompt}\n\nInstrucciones adicionales: ${promptToAdd}`;
-      setPrompt(newPrompt);
-      startEdit(media.id, media.edit_count);
-    }
-  };
-
-  // Función para manejar edición manual (sin opciones predefinidas)
-  const handleStartEdit = (mediaId: string, editCount: number) => {
-    const media = generations.find((g) => g.id === mediaId) || currentGeneration;
-    if (media) {
-      setPrompt(`Editar: ${media.prompt}`);
-      startEdit(mediaId, editCount);
-    }
+  const handleGenerateEdit = async (hiddenPrompt: string, clothingText: string, newWidth: number, newHeight: number) => {
+    if (!currentGeneration) return;
+    await generateEdit(currentGeneration.id, hiddenPrompt, clothingText, newWidth, newHeight);
   };
 
   // Estado vacío - sin generación
@@ -122,183 +104,199 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
 
   // Vista con imagen generada - Layout de 2 columnas
   return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }} 
-      animate={{ opacity: 1, x: 0 }} 
-      transition={{ delay: 0.2 }} 
-      className="w-full lg:w-1/2"
-    >
-      <div className="flex flex-col lg:flex-row gap-4 h-full">
-        {/* Columna izquierda - Imagen (70%) */}
-        <div className="lg:w-[65%] flex flex-col">
-          <div className="relative flex-1 overflow-hidden rounded-2xl border border-border bg-secondary/30">
-            <AnimatePresence mode="wait">
-              {currentGeneration && (
-                <motion.div 
-                  key="result" 
-                  initial={{ opacity: 0, scale: 0.95 }} 
-                  animate={{ opacity: 1, scale: 1 }} 
-                  exit={{ opacity: 0, scale: 0.95 }} 
-                  className="relative h-full min-h-[400px] lg:min-h-[500px]"
-                >
-                  <ProtectedImage
-                    src={currentGeneration.storage_url}
-                    alt={currentGeneration.prompt}
-                    className="h-full w-full object-contain"
-                    isApproved={isApproved}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Columna derecha - Panel de información (35%) */}
-        <div className="lg:w-[35%] flex flex-col gap-4">
-          {/* Sección PROMPT */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground tracking-wider">PROMPT</span>
-              <button
-                onClick={handleCopyPrompt}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {copiedPrompt ? (
-                  <>
-                    <Check className="h-3 w-3" />
-                    Copiado
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" />
-                    Copiar
-                  </>
+    <>
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }} 
+        animate={{ opacity: 1, x: 0 }} 
+        transition={{ delay: 0.2 }} 
+        className="w-full lg:w-1/2"
+      >
+        <div className="flex flex-col lg:flex-row gap-4 h-full">
+          {/* Columna izquierda - Imagen (65%) */}
+          <div className="lg:w-[65%] flex flex-col">
+            <div className="relative flex-1 overflow-hidden rounded-2xl border border-border bg-secondary/30">
+              <AnimatePresence mode="wait">
+                {currentGeneration && (
+                  <motion.div 
+                    key="result" 
+                    initial={{ opacity: 0, scale: 0.95 }} 
+                    animate={{ opacity: 1, scale: 1 }} 
+                    exit={{ opacity: 0, scale: 0.95 }} 
+                    className="relative h-full min-h-[400px] lg:min-h-[500px]"
+                  >
+                    <ProtectedImage
+                      src={currentGeneration.storage_url}
+                      alt={currentGeneration.prompt}
+                      className="h-full w-full object-contain"
+                      isApproved={isApproved}
+                    />
+                  </motion.div>
                 )}
-              </button>
+              </AnimatePresence>
             </div>
-            <p className="text-sm text-foreground leading-relaxed line-clamp-4">
-              {currentGeneration?.prompt}
-            </p>
           </div>
 
-          {/* Sección INFORMACIÓN */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <button
-              onClick={() => setIsInfoExpanded(!isInfoExpanded)}
-              className="flex w-full items-center justify-between text-xs font-medium text-muted-foreground tracking-wider hover:text-foreground transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                INFORMACIÓN
-              </span>
-              <ChevronDown className={cn(
-                "h-4 w-4 transition-transform",
-                isInfoExpanded && "rotate-180"
-              )} />
-            </button>
-            
-            <AnimatePresence>
-              {isInfoExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Modelo</span>
-                      <span className="text-sm font-medium text-foreground">Macondo AI</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Calidad</span>
-                      <span className="text-sm font-medium text-primary">1k</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Tamaño</span>
-                      <span className="text-sm font-medium text-foreground">{width}x{height}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Ediciones</span>
-                      <span className="text-sm font-medium text-foreground">{currentGeneration?.edit_count || 0}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Sección EDICIÓN RÁPIDA - Solo si NO está aprobada */}
-          {!isApproved && currentGeneration && (
+          {/* Columna derecha - Panel de información (35%) */}
+          <div className="lg:w-[35%] flex flex-col gap-4">
+            {/* Sección PROMPT */}
             <div className="rounded-xl border border-border bg-card p-4">
-              <EditOptionsPanel
-                onSelectOption={handleEditOption}
-                isExpanded={isEditExpanded}
-                onToggleExpand={() => setIsEditExpanded(!isEditExpanded)}
-              />
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground tracking-wider">PROMPT</span>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {copiedPrompt ? (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Copiar
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-sm text-foreground leading-relaxed line-clamp-4">
+                {currentGeneration?.prompt}
+              </p>
             </div>
-          )}
 
-          {/* Advertencia de imagen protegida */}
-          {!isApproved && currentGeneration && (
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-medium text-foreground text-sm">Imagen protegida</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Aprueba para descargar o reporta si hay errores
-                  </p>
+            {/* Sección INFORMACIÓN */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <button
+                onClick={() => setIsInfoExpanded(!isInfoExpanded)}
+                className="flex w-full items-center justify-between text-xs font-medium text-muted-foreground tracking-wider hover:text-foreground transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  INFORMACIÓN
+                </span>
+                <ChevronDown className={cn(
+                  "h-4 w-4 transition-transform",
+                  isInfoExpanded && "rotate-180"
+                )} />
+              </button>
+              
+              <AnimatePresence>
+                {isInfoExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Modelo</span>
+                        <span className="text-sm font-medium text-foreground">Macondo AI</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Calidad</span>
+                        <span className="text-sm font-medium text-primary">1k</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Tamaño</span>
+                        <span className="text-sm font-medium text-foreground">{width}x{height}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Ediciones</span>
+                        <span className="text-sm font-medium text-foreground">
+                          {currentGeneration?.edit_count || 0} / 2
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Advertencia de imagen protegida */}
+            {!isApproved && currentGeneration && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground text-sm">Imagen protegida</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Aprueba para descargar o reporta si hay errores
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Sección ACCIONES */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            {!isApproved ? (
-              <>
-                <Button 
-                  variant="default" 
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-                  onClick={() => currentGeneration && approveMedia(currentGeneration.id)}
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Aprobar imagen
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => currentGeneration && onOpenReport(currentGeneration.id)}
-                >
-                  <Flag className="mr-2 h-4 w-4" />
-                  Reportar problema
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  variant="gradient" 
-                  className="w-full"
-                  onClick={handleDownload}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Descargar imagen
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={onGenerateNew}
-                  disabled={isGenerating}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Nueva generación
-                </Button>
-              </>
             )}
+
+            {/* Sección ACCIONES */}
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              {!isApproved ? (
+                <>
+                  <Button 
+                    variant="default" 
+                    className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                    onClick={() => currentGeneration && approveMedia(currentGeneration.id)}
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Aprobar imagen
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    className="w-full"
+                    onClick={() => setShowEditModal(true)}
+                    disabled={(currentGeneration?.edit_count || 0) >= 2}
+                  >
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Editar imagen
+                    {(currentGeneration?.edit_count || 0) >= 2 && (
+                      <span className="ml-2 text-xs opacity-70">(límite alcanzado)</span>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => currentGeneration && onOpenReport(currentGeneration.id)}
+                  >
+                    <Flag className="mr-2 h-4 w-4" />
+                    Reportar problema
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    variant="gradient" 
+                    className="w-full"
+                    onClick={handleDownload}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar imagen
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={onGenerateNew}
+                    disabled={isGenerating}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Nueva generación
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      {/* Modal de edición */}
+      {currentGeneration && (
+        <EditModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          image={currentGeneration}
+          onGenerate={handleGenerateEdit}
+          maxEdits={2}
+        />
+      )}
+    </>
   );
 }
