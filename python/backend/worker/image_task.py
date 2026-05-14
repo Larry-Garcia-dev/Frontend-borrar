@@ -114,30 +114,48 @@ def generate_image_task(
             user_id, selected_model, has_refs,
         )
         
-        response = _run_async(
-            alibaba_client.generate_wan_image(
-                prompt=enriched_prompt,
-                model=selected_model,
-                negative_prompt=enriched_negative,
-                width=width,
-                height=height,
-                ref_images_b64=resolved_refs, # AQUÍ PASAMOS LA LISTA DE IMÁGENES BASE64
-                n=max(1, num_images),
-            )
-        )
-
-        image_urls = _extract_image_urls(response)
-        alibaba_task_id = response.get("output", {}).get("task_id")
-        
-        if not image_urls and alibaba_task_id:
-            result = _poll_alibaba_task(alibaba_task_id)
-            image_urls = _extract_image_urls(result)
-
-        if not image_urls:
-            raise ValueError(f"No image URL found in Alibaba response: {response}")
-
+        # Si se solicitan múltiples imágenes, generamos cada una por separado
+        # para garantizar variación (agregamos variación al prompt)
         storage_urls: list[str] = []
-        for image_url in image_urls[: max(1, num_images)]:
+        variations = [
+            "",  # Primera imagen sin variación
+            " with slight angle variation",  # Segunda con variación de ángulo
+            " with subtle lighting variation",  # Tercera con variación de luz
+        ]
+        
+        actual_num = max(1, num_images)
+        
+        for i in range(actual_num):
+            # Agregar variación sutil al prompt para cada imagen
+            variation_prompt = enriched_prompt
+            if i > 0 and i < len(variations):
+                variation_prompt = f"{enriched_prompt}{variations[i]}"
+            
+            response = _run_async(
+                alibaba_client.generate_wan_image(
+                    prompt=variation_prompt,
+                    model=selected_model,
+                    negative_prompt=enriched_negative,
+                    width=width,
+                    height=height,
+                    ref_images_b64=resolved_refs,
+                    n=1,  # Generamos 1 imagen a la vez para garantizar variación
+                )
+            )
+
+            image_urls = _extract_image_urls(response)
+            alibaba_task_id = response.get("output", {}).get("task_id")
+            
+            if not image_urls and alibaba_task_id:
+                result = _poll_alibaba_task(alibaba_task_id)
+                image_urls = _extract_image_urls(result)
+
+            if not image_urls:
+                logger.warning(f"No image URL found for variation {i}: {response}")
+                continue
+            
+            # Procesar la primera imagen de la respuesta
+            image_url = image_urls[0]
             image_bytes = _run_async(alibaba_client.download_bytes(image_url))
             ext = _guess_extension(image_url, fallback="png")
             filename = f"generated/{user_id}/{uuid.uuid4()}.{ext}"
@@ -155,6 +173,8 @@ def generate_image_task(
                 parent_media_id=parent_media_id,
             )
             storage_urls.append(storage_url)
+            
+            logger.info(f"Generated image {i+1}/{actual_num} for user {user_id}")
 
         return {"storage_urls": storage_urls, "count": len(storage_urls)}
 
