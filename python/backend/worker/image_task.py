@@ -118,12 +118,19 @@ def generate_image_task(
         # para garantizar variación (agregamos variación al prompt)
         storage_urls: list[str] = []
         variations = [
-            "",  # Primera imagen sin variación
-            " with slight angle variation",  # Segunda con variación de ángulo
-            " with subtle lighting variation",  # Tercera con variación de luz
+            "",  # 1. Sin variación
+            " with slight angle variation",  # 2. Variación de ángulo
+            " with subtle lighting variation",  # 3. Variación de luz
+            " with warm tone variation",  # 4. Tonos cálidos
+            " with cool tone variation",  # 5. Tonos fríos
+            " with high contrast variation",  # 6. Alto contraste
+            " with soft focus variation",  # 7. Enfoque suave
+            " with dramatic shadow variation",  # 8. Sombras dramáticas
+            " with bright highlight variation",  # 9. Brillos
+            " with cinematic color grading",  # 10. Color cinematográfico
         ]
         
-        actual_num = max(1, num_images)
+        actual_num = max(1, min(10, num_images))
         
         for i in range(actual_num):
             # Agregar variación sutil al prompt para cada imagen
@@ -219,6 +226,7 @@ def generate_explicit_image_task(
     additional_prompt: str = "",
     width: int = 1024,
     height: int = 1024,
+    num_images: int = 3,
     user_id: str,
 ) -> dict:
     """
@@ -260,13 +268,20 @@ def generate_explicit_image_task(
             user_id, selected_model, len(resolved_refs),
         )
         
-        # Generar 3 imágenes con variaciones sutiles para dar opciones al usuario
+        # Generar imágenes con variaciones sutiles para dar opciones al usuario
         storage_urls: list[str] = []
-        num_images_to_generate = 3
+        num_images_to_generate = max(1, min(10, num_images))  # Usar el parámetro dinámico
         variations = [
-            "",  # Primera imagen sin variación
-            " with dramatic lighting and shadows",  # Segunda con variación de luz
-            " with softer ambient lighting",  # Tercera con luz suave
+            "",  # 1. Sin variación
+            " with dramatic lighting and shadows",  # 2. Luz dramática
+            " with softer ambient lighting",  # 3. Luz suave
+            " with warm golden hour lighting",  # 4. Hora dorada
+            " with cool blue tone lighting",  # 5. Tonos fríos
+            " with high contrast studio lighting",  # 6. Alto contraste
+            " with natural window lighting",  # 7. Luz de ventana
+            " with moody low-key lighting",  # 8. Low-key
+            " with bright high-key lighting",  # 9. High-key
+            " with cinematic rim lighting",  # 10. Luz de borde cinematográfica
         ]
         
         for i in range(num_images_to_generate):

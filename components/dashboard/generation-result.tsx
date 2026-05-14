@@ -132,7 +132,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
       >
         <div className="flex flex-col lg:flex-row gap-4 h-full">
           {/* Columna izquierda - Imagen principal y miniaturas */}
-          <div className="lg:w-[65%] flex flex-col gap-4">
+          <div className="lg:w-[70%] flex flex-col gap-4">
             {/* Imagen principal seleccionada */}
             <div className="relative flex-1 overflow-hidden rounded-2xl border border-border bg-secondary/30">
               <AnimatePresence mode="wait">
@@ -166,15 +166,20 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
               </AnimatePresence>
             </div>
 
-            {/* Miniaturas de las 3 imágenes */}
+            {/* Miniaturas de las imágenes - Grid adaptativo */}
             {images.length > 1 && (
-              <div className="grid grid-cols-3 gap-3">
+              <div className={cn(
+                "grid gap-2",
+                images.length <= 3 ? "grid-cols-3" :
+                images.length <= 6 ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" :
+                "grid-cols-4 sm:grid-cols-5 lg:grid-cols-5"
+              )}>
                 {images.map((image, index) => (
                   <button
                     key={image.id}
                     onClick={() => setSelectedIndex(index)}
                     className={cn(
-                      "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                      "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
                       selectedIndex === index 
                         ? "border-primary ring-2 ring-primary/30 scale-[1.02]" 
                         : "border-border hover:border-primary/50"
@@ -187,7 +192,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                     />
                     {/* Overlay con número */}
                     <div className={cn(
-                      "absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                      "absolute top-1 left-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
                       selectedIndex === index 
                         ? "bg-primary text-primary-foreground" 
                         : "bg-background/80 text-foreground"
@@ -196,7 +201,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                     </div>
                     {/* Indicador de aprobación */}
                     {image.is_approved && (
-                      <div className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                      <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
                         <Check className="h-3 w-3 text-white" />
                       </div>
                     )}
@@ -207,7 +212,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
           </div>
 
           {/* Columna derecha - Panel de información */}
-          <div className="lg:w-[35%] flex flex-col gap-4">
+          <div className="lg:w-[30%] flex flex-col gap-4 overflow-y-auto max-h-[600px]">
             {/* Sección PROMPT */}
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between mb-3">

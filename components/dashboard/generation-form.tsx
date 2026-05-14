@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Wand2, Upload, X, Edit3, Flame } from "lucide-react";
+import { Sparkles, Wand2, Upload, X, Edit3, Flame, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { api } from "@/lib/api-client";
@@ -34,6 +35,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     referenceImageUrls, setReferenceImageUrls, uploadReferenceImages,
     parentMediaId, parentEditCount, cancelEdit,
     isExplicitMode, setIsExplicitMode,
+    numImages, setNumImages,
   } = useGenerationStore();
   const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -216,7 +218,35 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </select>
           </div>
 
-          {/* 4. Imágenes de Referencia */}
+          {/* 4. Selector de Cantidad de Imágenes */}
+          {!isEditing && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-base font-medium text-foreground">
+                  <Images className="h-4 w-4 text-primary" />
+                  Cantidad de imágenes
+                </label>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
+                  {numImages} {numImages === 1 ? "imagen" : "imágenes"}
+                </span>
+              </div>
+              <Slider
+                value={[numImages]}
+                onValueChange={(value) => setNumImages(value[0])}
+                min={1}
+                max={10}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>1</span>
+                <span>5</span>
+                <span>10</span>
+              </div>
+            </div>
+          )}
+
+          {/* 5. Imágenes de Referencia */}
           {!isModeloOrStudio && (
             <div className="space-y-3">
               <label className="block text-base font-medium text-foreground">Imágenes de referencia (opcional)</label>

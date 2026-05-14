@@ -39,13 +39,14 @@ class GenerationRequest(BaseModel):
 
 
 class ExplicitGenerationRequest(BaseModel):
-    """Request para generación de contenido explícito con 3 imágenes."""
+    """Request para generación de contenido explícito con imágenes."""
     background_b64: str  # Base64 de la imagen de fondo seleccionada
     pose_b64: str  # Base64 de la imagen de pose seleccionada
     reference_url: str  # URL de la foto de referencia de la modelo (ya está en servidor)
     additional_prompt: str = ""  # Instrucciones adicionales opcionales
     width: int = 1024
     height: int = 1024
+    num_images: int = 3  # Cantidad de imágenes a generar (1-10)
 
 
 class ReferenceImagesResponse(BaseModel):
@@ -295,6 +296,7 @@ async def create_explicit_generation(
         )
     
     # Encolar la tarea de generación explícita con base64 para fondo y pose
+    actual_num_images = max(1, min(10, request.num_images))  # Limitar entre 1 y 10
     task = generate_explicit_image_task.delay(
         background_b64=request.background_b64,
         pose_b64=request.pose_b64,
@@ -302,6 +304,7 @@ async def create_explicit_generation(
         additional_prompt=request.additional_prompt,
         width=request.width,
         height=request.height,
+        num_images=actual_num_images,
         user_id=str(current_user["id"]),
     )
     

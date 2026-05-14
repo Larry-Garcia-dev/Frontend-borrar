@@ -155,8 +155,8 @@ export function EditModal({
         negativePrompt = EXPLICIT_NEGATIVE_PROMPT;
       }
       
-      // Generar 3 imágenes diferentes
-      const numImages = 3;
+      // La edición siempre genera solo 1 imagen (las primeras 2 ediciones son gratis)
+      const numImages = 1;
       
       await onGenerate(hiddenPrompt, negativePrompt, clothingText, customPrompt, selectedSize.width, selectedSize.height, numImages);
       onClose();
