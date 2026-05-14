@@ -11,6 +11,7 @@ import {
 interface GenerationState {
   generations: GeneratedMedia[];
   currentGeneration: GeneratedMedia | null;
+  currentGenerations: GeneratedMedia[]; // Para múltiples imágenes generadas
   isGenerating: boolean;
   isLoading: boolean;
   error: string | null;
@@ -66,6 +67,7 @@ interface GenerationState {
 export const useGenerationStore = create<GenerationState>((set, get) => ({
   generations: [],
   currentGeneration: null,
+  currentGenerations: [],
   isGenerating: false,
   isLoading: false,
   error: null,
@@ -131,6 +133,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       progress: 0,
       taskStatus: "queued",
       currentGeneration: null,
+      currentGenerations: [],
     });
 
     try {
@@ -163,8 +166,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       const task = await api.createGeneration(request);
       set({ taskId: task.task_id, taskStatus: task.status });
 
-      const result = await api.waitForGeneration(
+      // Usar la nueva función para obtener múltiples imágenes
+      const results = await api.waitForMultipleGenerations(
         task.task_id,
+        numImages,
         (status) => {
           set({ taskStatus: status });
           if (status === "pending" || status === "queued") {
@@ -177,22 +182,22 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         }
       );
 
-      if (result) {
-        const resolvedResult = {
+      if (results && results.length > 0) {
+        const resolvedResults = results.map(result => ({
           ...result,
           storage_url: resolveMediaUrl(result.storage_url),
-        };
+        }));
         set({
-          currentGeneration: resolvedResult,
-          generations: [resolvedResult, ...get().generations],
+          currentGeneration: resolvedResults[0],
+          currentGenerations: resolvedResults,
+          generations: [...resolvedResults, ...get().generations],
           isGenerating: false,
           progress: 100,
           taskStatus: "success",
           parentMediaId: null,
           parentEditCount: 0,
         });
-        // Retornamos como array para consistencia aunque por ahora solo devolvemos 1
-        return [resolvedResult];
+        return resolvedResults;
       }
 
       set({ isGenerating: false, progress: 0, taskStatus: "" });
@@ -429,6 +434,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       parentEditCount: 0,
       selectedSize: "1080x1080 (1:1)",
       currentGeneration: null,
+      currentGenerations: [],
       progress: 0,
       taskStatus: "",
       taskId: null,

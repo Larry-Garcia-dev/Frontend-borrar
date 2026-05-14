@@ -56,6 +56,27 @@ export const createGenerationApi = (client: BaseAPIClient) => {
       }
       throw new Error("Tiempo de espera agotado para la generacion");
     },
+    
+    // Nueva función para obtener múltiples imágenes generadas
+    async waitForMultipleGenerations(taskId: string, numImages: number = 3, onProgress?: (status: string, detail: string) => void, maxAttempts = 120, intervalMs = 2000): Promise<GeneratedMedia[]> {
+      let attempts = 0;
+      while (attempts < maxAttempts) {
+        const status = await apiMethods.getTaskStatus(taskId);
+        if (onProgress) onProgress(status.status, status.detail);
+        
+        if (status.status === "success") {
+          const media = await apiMethods.getGenerations();
+          // Obtener las últimas N imágenes generadas (las más recientes)
+          return media.slice(0, numImages);
+        }
+        if (status.status === "failure") {
+          throw new Error(status.detail || "Error en la generacion");
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        attempts++;
+      }
+      throw new Error("Tiempo de espera agotado para la generacion");
+    },
     async generateImage(data: GenerationRequest): Promise<GeneratedMedia> {
       const task = await apiMethods.createGeneration(data);
       const result = await apiMethods.waitForGeneration(task.task_id);
