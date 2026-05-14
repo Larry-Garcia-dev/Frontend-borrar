@@ -260,31 +260,64 @@ def generate_explicit_image_task(
             user_id, selected_model, len(resolved_refs),
         )
         
-        response = _run_async(
-            alibaba_client.generate_wan_image(
-                prompt=final_prompt,
-                model=selected_model,
-                negative_prompt=EXPLICIT_NEGATIVE_PROMPT,
-                width=width,
-                height=height,
-                ref_images_b64=resolved_refs,
-                n=1,
-            )
-        )
-
-        image_urls = _extract_image_urls(response)
-        alibaba_task_id = response.get("output", {}).get("task_id")
-        
-        if not image_urls and alibaba_task_id:
-            result = _poll_alibaba_task(alibaba_task_id)
-            image_urls = _extract_image_urls(result)
-
-        if not image_urls:
-            raise ValueError(f"No image URL found in Alibaba response: {response}")
-
+        # Generar 3 imágenes con variaciones sutiles para dar opciones al usuario
         storage_urls: list[str] = []
-        for image_url in image_urls[:1]:  # Solo generamos 1 imagen
-            image_bytes = _run_async(alibaba_client.download_bytes(image_url))
+        num_images_to_generate = 3
+        variations = [
+            "",  # Primera imagen sin variación
+            " with dramatic lighting and shadows",  # Segunda con variación de luz
+            " with softer ambient lighting",  # Tercera con luz suave
+        ]
+        
+        for i in range(num_images_to_generate):
+            # Agregar variación sutil al prompt para cada imagen
+            variation_prompt = final_prompt
+            if i > 0 and i < len(variations):
+                variation_prompt = f"{final_prompt}\n\nLIGHTING STYLE: {variations[i]}"
+            
+            response = _run_async(
+                alibaba_client.generate_wan_image(
+                    prompt=variation_prompt,
+                    model=selected_model,
+                    negative_prompt=EXPLICIT_NEGATIVE_PROMPT,
+                    width=width,
+                    height=height,
+                    ref_images_b64=resolved_refs,
+                    n=1,
+                )
+            )
+
+            image_urls = _extract_image_urls(response)
+            alibaba_task_id = response.get("output", {}).get("task_id")
+            
+            if not image_urls and alibaba_task_id:
+                result = _poll_alibaba_task(alibaba_task_id)
+                image_urls = _extract_image_urls(result)
+
+            if not image_urls:
+                logger.warning(f"No image URL found for explicit variation {i+1}: {response}")
+                continue
+            
+            # Descargar con retry individual
+            image_url = image_urls[0]
+            image_bytes = None
+            
+            for download_attempt in range(3):
+                try:
+                    image_bytes = _run_async(alibaba_client.download_bytes(image_url))
+                    break
+                except Exception as download_exc:
+                    logger.warning(f"Download attempt {download_attempt + 1}/3 failed for explicit image {i+1}: {download_exc}")
+                    if download_attempt < 2:
+                        import time
+                        time.sleep(2)
+                    else:
+                        logger.error(f"Failed to download explicit image {i+1} after 3 attempts, skipping...")
+            
+            if not image_bytes:
+                logger.warning(f"Skipping explicit image {i+1} due to download failure")
+                continue
+            
             ext = _guess_extension(image_url, fallback="png")
             filename = f"generated/explicit/{user_id}/{uuid.uuid4()}.{ext}"
             content_type = "image/png" if ext == "png" else "image/jpeg"
@@ -301,7 +334,12 @@ def generate_explicit_image_task(
                 parent_media_id=None,
             )
             storage_urls.append(storage_url)
+            logger.info(f"Generated explicit image {i+1}/{num_images_to_generate} for user {user_id}")
 
+        # Verificar que al menos se generó 1 imagen
+        if not storage_urls:
+            raise ValueError("No explicit images were generated successfully")
+        
         logger.info("Explicit generation completed: user=%s urls=%d", user_id, len(storage_urls))
         return {"storage_urls": storage_urls, "count": len(storage_urls)}
 
