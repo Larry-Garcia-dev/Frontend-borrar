@@ -52,7 +52,7 @@ interface GenerationState {
   cancelEdit: () => void;
   reportMedia: (mediaId: string, reason: string) => Promise<void>;
   approveMedia: (mediaId: string) => Promise<void>;
-  generateEdit: (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => Promise<GeneratedMedia | null>;
+  generateEdit: (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number) => Promise<GeneratedMedia[] | null>;
 
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
@@ -109,7 +109,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   // Generar edición con prompt oculto (el usuario no ve el prompt interno)
-  generateEdit: async (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => {
+  // Genera múltiples imágenes diferentes
+  generateEdit: async (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number = 3) => {
     const state = get();
     const media = state.generations.find(g => g.id === mediaId) || state.currentGeneration;
     
@@ -143,6 +144,11 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       if (clothingText.trim()) {
         fullPrompt += `. Change clothing to: ${clothingText.trim()}`;
       }
+      
+      // Agregar el prompt personalizado del usuario
+      if (customPrompt.trim()) {
+        fullPrompt += `. ${customPrompt.trim()}`;
+      }
 
       const request: GenerationRequest = {
         prompt: fullPrompt,
@@ -151,6 +157,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         height,
         media_type: "image",
         parent_media_id: mediaId,
+        num_images: numImages, // Generar múltiples imágenes diferentes
       };
 
       const task = await api.createGeneration(request);
@@ -184,7 +191,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
           parentMediaId: null,
           parentEditCount: 0,
         });
-        return resolvedResult;
+        // Retornamos como array para consistencia aunque por ahora solo devolvemos 1
+        return [resolvedResult];
       }
 
       set({ isGenerating: false, progress: 0, taskStatus: "" });

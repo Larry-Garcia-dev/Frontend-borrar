@@ -10,10 +10,12 @@ import {
   Maximize,
   Wand2,
   Check,
-  AlertCircle
+  AlertCircle,
+  PenLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ProtectedImage } from "@/components/protected-image";
 import { GeneratedMedia } from "@/lib/api-client";
@@ -99,7 +101,7 @@ interface EditModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: GeneratedMedia;
-  onGenerate: (hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => Promise<void>;
+  onGenerate: (hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number) => Promise<void>;
   maxEdits?: number;
   isExplicit?: boolean;
 }
@@ -114,6 +116,7 @@ export function EditModal({
 }: EditModalProps) {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [clothingText, setClothingText] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
   const [selectedSize, setSelectedSize] = useState(SIZE_OPTIONS[0]);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -152,7 +155,10 @@ export function EditModal({
         negativePrompt = EXPLICIT_NEGATIVE_PROMPT;
       }
       
-      await onGenerate(hiddenPrompt, negativePrompt, clothingText, selectedSize.width, selectedSize.height);
+      // Generar 3 imágenes diferentes
+      const numImages = 3;
+      
+      await onGenerate(hiddenPrompt, negativePrompt, clothingText, customPrompt, selectedSize.width, selectedSize.height, numImages);
       onClose();
     } catch (error) {
       console.error("[v0] Error generating edit:", error);
@@ -161,7 +167,7 @@ export function EditModal({
     }
   };
 
-  const hasSelections = selectedOptions.length > 0 || clothingText.trim().length > 0;
+  const hasSelections = selectedOptions.length > 0 || clothingText.trim().length > 0 || customPrompt.trim().length > 0;
 
   if (!isOpen) return null;
 
@@ -269,6 +275,25 @@ export function EditModal({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Edición personalizada por texto */}
+            <div className="space-y-3 mb-6">
+              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <PenLine className="h-4 w-4" />
+                Edición personalizada
+              </Label>
+              <Textarea
+                placeholder="Escribe lo que quieres cambiar en la imagen. Ej: cambiar el fondo a una playa, agregar sonrisa, cambiar color de cabello..."
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                disabled={!canEdit}
+                className="bg-secondary/30 border-border focus:border-primary min-h-[80px] resize-none"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Describe con detalle los cambios que deseas realizar
+              </p>
             </div>
 
             {/* Cambio de ropa - Solo visible en modo NO explícito */}
