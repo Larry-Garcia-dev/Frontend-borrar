@@ -85,8 +85,6 @@ def generate_image_task(
     parent_media_id: Optional[str] = None,
 ) -> dict:
     
-    logger.info(f"[v0] generate_image_task started: num_images={num_images}, user={user_id}")
-    
     try:
         with SessionLocal() as db:
             sys_prompt = get_active_system_prompt(db)
@@ -126,7 +124,6 @@ def generate_image_task(
         ]
         
         actual_num = max(1, num_images)
-        logger.info(f"[v0] Will generate {actual_num} images (num_images param was {num_images})")
         
         for i in range(actual_num):
             # Agregar variación sutil al prompt para cada imagen
@@ -157,9 +154,28 @@ def generate_image_task(
                 logger.warning(f"No image URL found for variation {i}: {response}")
                 continue
             
-            # Procesar la primera imagen de la respuesta
+            # Procesar la primera imagen de la respuesta con retry individual
             image_url = image_urls[0]
-            image_bytes = _run_async(alibaba_client.download_bytes(image_url))
+            image_bytes = None
+            
+            # Intentar descargar con retry individual (máx 3 intentos)
+            for download_attempt in range(3):
+                try:
+                    image_bytes = _run_async(alibaba_client.download_bytes(image_url))
+                    break  # Descarga exitosa
+                except Exception as download_exc:
+                    logger.warning(f"Download attempt {download_attempt + 1}/3 failed for image {i+1}: {download_exc}")
+                    if download_attempt < 2:
+                        import time
+                        time.sleep(2)  # Esperar 2 segundos antes de reintentar
+                    else:
+                        logger.error(f"Failed to download image {i+1} after 3 attempts, skipping...")
+                        continue
+            
+            if not image_bytes:
+                logger.warning(f"Skipping image {i+1} due to download failure")
+                continue
+            
             ext = _guess_extension(image_url, fallback="png")
             filename = f"generated/{user_id}/{uuid.uuid4()}.{ext}"
             content_type = "image/png" if ext == "png" else "image/jpeg"
@@ -179,7 +195,12 @@ def generate_image_task(
             
             logger.info(f"Generated image {i+1}/{actual_num} for user {user_id}")
 
-        return {"storage_urls": storage_urls, "count": len(storage_urls)}
+        # Si al menos generamos 1 imagen, consideramos éxito
+        if storage_urls:
+            logger.info(f"Successfully generated {len(storage_urls)}/{actual_num} images for user {user_id}")
+            return {"storage_urls": storage_urls, "count": len(storage_urls)}
+        else:
+            raise ValueError("No images were generated successfully")
 
     except Exception as exc:
         logger.exception("Image generation failed: %s", exc)

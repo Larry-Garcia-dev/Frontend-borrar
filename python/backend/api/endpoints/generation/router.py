@@ -185,10 +185,6 @@ async def create_generation(
                 detail="No tienes créditos disponibles.",
             )
 
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"[v0] create_generation received: num_images={request.num_images}, media_type={request.media_type}")
-    
     if request.media_type == "video":
         task = generate_video_task.delay(
             prompt=request.prompt,
@@ -200,7 +196,6 @@ async def create_generation(
         )
     else:
         actual_num_images = max(1, request.num_images)
-        logger.info(f"[v0] Dispatching generate_image_task with num_images={actual_num_images}")
         task = generate_image_task.delay(
             prompt=request.prompt,
             negative_prompt=request.negative_prompt,
