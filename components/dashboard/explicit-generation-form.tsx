@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,19 +68,44 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   const [step, setStep] = useState<Step>("background");
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
   const [selectedPose, setSelectedPose] = useState<string | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [additionalPrompt, setAdditionalPrompt] = useState<string>("");
+  const [randomSeed, setRandomSeed] = useState(0);
 
   const trainingPhotos = modelProfile.explicit_training_photos || [];
+
+  // Función para obtener 4 fotos aleatorias
+  const getRandomPhotos = useCallback((photos: string[], count: number = 4): string[] => {
+    if (photos.length <= count) return photos;
+    const shuffled = [...photos].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }, []);
+
+  // Generar fotos aleatorias cuando cambie el seed o se llegue al paso 3
+  const randomPhotos = useMemo(() => {
+    return getRandomPhotos(trainingPhotos, 4);
+  }, [trainingPhotos, randomSeed, getRandomPhotos]);
+
+  // Seleccionar automáticamente todas las fotos random cuando se llega al paso 3
+  useEffect(() => {
+    if (step === "photo" && randomPhotos.length > 0) {
+      setSelectedPhotos(randomPhotos);
+    }
+  }, [step, randomPhotos]);
+
+  // Función para refrescar las fotos aleatorias
+  const handleRefreshPhotos = () => {
+    setRandomSeed(prev => prev + 1);
+  };
   
   const remainingCredits = user
     ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
     : 0;
 
-  const canGenerate = selectedBackground && selectedPose && selectedPhoto;
+  const canGenerate = selectedBackground && selectedPose && selectedPhotos.length > 0;
 
   const handleGenerate = async () => {
-    if (!canGenerate || !selectedBackground || !selectedPose || !selectedPhoto) return;
+    if (!canGenerate || !selectedBackground || !selectedPose || selectedPhotos.length === 0) return;
     
     clearError();
     onGenerateStart();
@@ -105,11 +130,13 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
         : `${background.name} setting, ${pose.name} pose`;
 
-      // Usar el store para la generación - esto actualiza isGenerating y currentGeneration
+      // Usar el store para la generación con múltiples fotos de referencia
+      // Seleccionamos la primera foto como referencia principal
       await generateExplicit({
         background_b64: backgroundB64,
         pose_b64: poseB64,
-        reference_url: selectedPhoto,
+        reference_url: selectedPhotos[0],
+        reference_urls: selectedPhotos, // Enviamos todas las fotos aleatorias
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
@@ -303,7 +330,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
               </motion.div>
             )}
 
-            {/* Step 3: Seleccionar Foto de Referencia */}
+            {/* Step 3: Fotos de Referencia (4 aleatorias) */}
             {step === "photo" && (
               <motion.div
                 key="photo"
@@ -312,43 +339,50 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-4"
               >
-                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-rose-400" />
-                  Selecciona tu foto de referencia
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-rose-400" />
+                    Fotos de referencia
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshPhotos}
+                    className="text-xs border-rose-500/30 hover:bg-rose-500/10"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Cambiar fotos
+                  </Button>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Estas son las fotos que subiste durante el entrenamiento
+                  Hemos seleccionado 4 fotos al azar de tu entrenamiento
                 </p>
-                {trainingPhotos.length === 0 ? (
+                {randomPhotos.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No tienes fotos de entrenamiento explícitas disponibles
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto">
-                    {trainingPhotos.map((photo, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedPhoto(photo)}
-                        className={cn(
-                          "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
-                          selectedPhoto === photo
-                            ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
-                            : "border-transparent hover:border-rose-500/50"
-                        )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {randomPhotos.map((photo, idx) => (
+                      <div
+                        key={`${photo}-${idx}`}
+                        className="relative aspect-square rounded-xl overflow-hidden border-2 border-rose-500/50 ring-2 ring-rose-500/30"
                       >
                         <img
                           src={photo}
                           alt={`Foto ${idx + 1}`}
                           className="w-full h-full object-cover"
                         />
-                        {selectedPhoto === photo && (
-                          <div className="absolute inset-0 bg-rose-500/20 flex items-center justify-center">
-                            <div className="bg-rose-500 rounded-full p-2">
-                              <Check className="h-5 w-5 text-white" />
-                            </div>
+                        <div className="absolute top-2 left-2 bg-rose-500 rounded-full px-2 py-0.5">
+                          <span className="text-xs text-white font-medium">{idx + 1}</span>
+                        </div>
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <div className="flex items-center justify-center">
+                            <Check className="h-4 w-4 text-rose-400 mr-1" />
+                            <span className="text-xs text-white">Seleccionada</span>
                           </div>
-                        )}
-                      </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -361,7 +395,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   </Button>
                   <Button
                     onClick={() => goToStep("confirm")}
-                    disabled={!selectedPhoto}
+                    disabled={randomPhotos.length === 0}
                     className="bg-rose-500 hover:bg-rose-600"
                   >
                     Siguiente <ChevronRight className="h-4 w-4 ml-1" />
@@ -384,7 +418,8 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   Confirma tu selección
                 </h3>
                 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Fondo y Pose */}
+                <div className="grid grid-cols-2 gap-3">
                   {/* Fondo */}
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground text-center">Fondo</p>
@@ -403,7 +438,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                   {/* Pose */}
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground text-center">Pose</p>
-                    <div className="aspect-square rounded-lg overflow-hidden border border-rose-500/30">
+                    <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30">
                       <img
                         src={POSES.find(p => p.id === selectedPose)?.image}
                         alt="Pose seleccionada"
@@ -414,18 +449,27 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                       {POSES.find(p => p.id === selectedPose)?.name}
                     </p>
                   </div>
-                  
-                  {/* Foto */}
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground text-center">Tu foto</p>
-                    <div className="aspect-square rounded-lg overflow-hidden border border-rose-500/30">
-                      <img
-                        src={selectedPhoto || ""}
-                        alt="Foto seleccionada"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="text-xs text-center text-rose-300">Referencia</p>
+                </div>
+
+                {/* Fotos de referencia (4 aleatorias) */}
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground text-center">Fotos de referencia ({selectedPhotos.length})</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {selectedPhotos.map((photo, idx) => (
+                      <div 
+                        key={`confirm-${idx}`}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-rose-500/30"
+                      >
+                        <img
+                          src={photo}
+                          alt={`Foto ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-1 left-1 bg-rose-500/80 rounded-full w-4 h-4 flex items-center justify-center">
+                          <span className="text-[10px] text-white font-bold">{idx + 1}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
