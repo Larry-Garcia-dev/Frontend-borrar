@@ -51,6 +51,10 @@ const EDIT_OPTIONS_NORMAL = [
   },
 ];
 
+// Prompts base para modo explícito (se agregan a todas las opciones)
+const EXPLICIT_POSITIVE_PROMPT = "fully nude, completely naked, no clothes, bare skin, nude body, exposed body, without any clothing or fabric";
+const EXPLICIT_NEGATIVE_PROMPT = "clothing, clothes, dressed, fabric, shirt, pants, dress, underwear, bra, panties, bikini, swimsuit, lingerie, covered body, any garment";
+
 // Opciones de edición con prompts ocultos - versión explícita (completamente desnudo)
 const EDIT_OPTIONS_EXPLICIT = [
   {
@@ -58,28 +62,28 @@ const EDIT_OPTIONS_EXPLICIT = [
     label: "Piel suave",
     icon: Sparkles,
     description: "Suaviza la textura de la piel",
-    hiddenPrompt: "Apply soft skin filter, smooth skin texture, reduce blemishes and imperfections, maintain natural look, soft focus on skin areas, fully nude body, no clothing, completely naked",
+    hiddenPrompt: "Apply soft skin filter, smooth skin texture, reduce blemishes and imperfections, maintain natural look, soft focus on skin areas",
   },
   {
     id: "piel-realista",
     label: "Piel realista",
     icon: Wand2,
     description: "Mejora el realismo de la piel",
-    hiddenPrompt: "Enhance skin realism, add natural skin texture and pores, realistic skin tones, photorealistic skin details, natural lighting on skin, fully nude body, no clothing, completely naked",
+    hiddenPrompt: "Enhance skin realism, add natural skin texture and pores, realistic skin tones, photorealistic skin details, natural lighting on skin",
   },
   {
     id: "mejorar-calidad",
     label: "Mejorar calidad",
     icon: Maximize,
     description: "Aumenta la resolución",
-    hiddenPrompt: "Upscale image, enhance resolution, improve sharpness and clarity, high quality details, 4K enhancement, fully nude body, no clothing, completely naked",
+    hiddenPrompt: "Upscale image, enhance resolution, improve sharpness and clarity, high quality details, 4K enhancement",
   },
   {
     id: "cambiar-iluminacion",
     label: "Cambiar iluminación",
     icon: Sun,
     description: "Ajusta la luz de la imagen",
-    hiddenPrompt: "Adjust lighting, enhance natural light, improve shadows and highlights, cinematic lighting, professional studio lighting, fully nude body, no clothing, completely naked",
+    hiddenPrompt: "Adjust lighting, enhance natural light, improve shadows and highlights, cinematic lighting, professional studio lighting",
   },
 ];
 
@@ -95,7 +99,7 @@ interface EditModalProps {
   isOpen: boolean;
   onClose: () => void;
   image: GeneratedMedia;
-  onGenerate: (hiddenPrompt: string, clothingText: string, width: number, height: number) => Promise<void>;
+  onGenerate: (hiddenPrompt: string, negativePrompt: string, clothingText: string, width: number, height: number) => Promise<void>;
   maxEdits?: number;
   isExplicit?: boolean;
 }
@@ -139,9 +143,16 @@ export function EditModal({
         .filter(opt => selectedOptions.includes(opt.id))
         .map(opt => opt.hiddenPrompt);
       
-      const hiddenPrompt = selectedPrompts.join(". ");
+      let hiddenPrompt = selectedPrompts.join(". ");
+      let negativePrompt = "";
       
-      await onGenerate(hiddenPrompt, clothingText, selectedSize.width, selectedSize.height);
+      // Si es modo explícito, agregar prompts de desnudo
+      if (isExplicit) {
+        hiddenPrompt = `${EXPLICIT_POSITIVE_PROMPT}. ${hiddenPrompt}`;
+        negativePrompt = EXPLICIT_NEGATIVE_PROMPT;
+      }
+      
+      await onGenerate(hiddenPrompt, negativePrompt, clothingText, selectedSize.width, selectedSize.height);
       onClose();
     } catch (error) {
       console.error("[v0] Error generating edit:", error);
