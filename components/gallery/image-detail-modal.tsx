@@ -20,7 +20,7 @@ interface ImageDetailModalProps {
 
 export function ImageDetailModal({ image, onClose, onApprove, onReport, onDownload }: ImageDetailModalProps) {
   const [showEditModal, setShowEditModal] = useState(false);
-  const { generateEdit } = useGenerationStore();
+  const { generateEdit, isExplicitMode } = useGenerationStore();
 
   if (!image) return null;
 
@@ -162,6 +162,7 @@ export function ImageDetailModal({ image, onClose, onApprove, onReport, onDownlo
         image={image}
         onGenerate={handleGenerateEdit}
         maxEdits={2}
+        isExplicit={isExplicitMode}
       />
     </>
   );

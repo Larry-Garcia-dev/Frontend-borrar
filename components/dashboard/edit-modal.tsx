@@ -19,8 +19,8 @@ import { ProtectedImage } from "@/components/protected-image";
 import { GeneratedMedia } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-// Opciones de edición con prompts ocultos
-const EDIT_OPTIONS = [
+// Opciones de edición con prompts ocultos - versión normal
+const EDIT_OPTIONS_NORMAL = [
   {
     id: "piel-suave",
     label: "Piel suave",
@@ -51,6 +51,38 @@ const EDIT_OPTIONS = [
   },
 ];
 
+// Opciones de edición con prompts ocultos - versión explícita (completamente desnudo)
+const EDIT_OPTIONS_EXPLICIT = [
+  {
+    id: "piel-suave",
+    label: "Piel suave",
+    icon: Sparkles,
+    description: "Suaviza la textura de la piel",
+    hiddenPrompt: "Apply soft skin filter, smooth skin texture, reduce blemishes and imperfections, maintain natural look, soft focus on skin areas, fully nude body, no clothing, completely naked",
+  },
+  {
+    id: "piel-realista",
+    label: "Piel realista",
+    icon: Wand2,
+    description: "Mejora el realismo de la piel",
+    hiddenPrompt: "Enhance skin realism, add natural skin texture and pores, realistic skin tones, photorealistic skin details, natural lighting on skin, fully nude body, no clothing, completely naked",
+  },
+  {
+    id: "mejorar-calidad",
+    label: "Mejorar calidad",
+    icon: Maximize,
+    description: "Aumenta la resolución",
+    hiddenPrompt: "Upscale image, enhance resolution, improve sharpness and clarity, high quality details, 4K enhancement, fully nude body, no clothing, completely naked",
+  },
+  {
+    id: "cambiar-iluminacion",
+    label: "Cambiar iluminación",
+    icon: Sun,
+    description: "Ajusta la luz de la imagen",
+    hiddenPrompt: "Adjust lighting, enhance natural light, improve shadows and highlights, cinematic lighting, professional studio lighting, fully nude body, no clothing, completely naked",
+  },
+];
+
 // Opciones de tamaño
 const SIZE_OPTIONS = [
   { id: "1080x1080", label: "1080x1080", ratio: "1:1", width: 1080, height: 1080 },
@@ -65,6 +97,7 @@ interface EditModalProps {
   image: GeneratedMedia;
   onGenerate: (hiddenPrompt: string, clothingText: string, width: number, height: number) => Promise<void>;
   maxEdits?: number;
+  isExplicit?: boolean;
 }
 
 export function EditModal({ 
@@ -72,12 +105,16 @@ export function EditModal({
   onClose, 
   image, 
   onGenerate,
-  maxEdits = 2 
+  maxEdits = 2,
+  isExplicit = false 
 }: EditModalProps) {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [clothingText, setClothingText] = useState("");
   const [selectedSize, setSelectedSize] = useState(SIZE_OPTIONS[0]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Seleccionar las opciones de edición según el modo
+  const EDIT_OPTIONS = isExplicit ? EDIT_OPTIONS_EXPLICIT : EDIT_OPTIONS_NORMAL;
 
   // Verificar si se pueden hacer más ediciones
   const editsRemaining = maxEdits - (image.edit_count || 0);
@@ -223,23 +260,25 @@ export function EditModal({
               </div>
             </div>
 
-            {/* Cambio de ropa */}
-            <div className="space-y-3 mb-6">
-              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Shirt className="h-4 w-4" />
-                Cambio de ropa
-              </Label>
-              <Input
-                placeholder="Ej: vestido rojo elegante, bikini azul, lencería negra..."
-                value={clothingText}
-                onChange={(e) => setClothingText(e.target.value)}
-                disabled={!canEdit}
-                className="bg-secondary/30 border-border focus:border-primary"
-              />
-              <p className="text-xs text-muted-foreground">
-                Describe la ropa que deseas para la imagen
-              </p>
-            </div>
+            {/* Cambio de ropa - Solo visible en modo NO explícito */}
+            {!isExplicit && (
+              <div className="space-y-3 mb-6">
+                <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Shirt className="h-4 w-4" />
+                  Cambio de ropa
+                </Label>
+                <Input
+                  placeholder="Ej: vestido rojo elegante, bikini azul, lencería negra..."
+                  value={clothingText}
+                  onChange={(e) => setClothingText(e.target.value)}
+                  disabled={!canEdit}
+                  className="bg-secondary/30 border-border focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Describe la ropa que deseas para la imagen
+                </p>
+              </div>
+            )}
 
             {/* Tamaño de imagen */}
             <div className="space-y-3 mb-6">
