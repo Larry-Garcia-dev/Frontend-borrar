@@ -163,6 +163,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         num_images: numImages, // Generar múltiples imágenes diferentes
       };
 
+      console.log("[v0] generateEdit request:", { numImages, request });
+
       const task = await api.createGeneration(request);
       set({ taskId: task.task_id, taskStatus: task.status });
 

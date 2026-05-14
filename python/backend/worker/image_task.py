@@ -85,6 +85,8 @@ def generate_image_task(
     parent_media_id: Optional[str] = None,
 ) -> dict:
     
+    logger.info(f"[v0] generate_image_task started: num_images={num_images}, user={user_id}")
+    
     try:
         with SessionLocal() as db:
             sys_prompt = get_active_system_prompt(db)
@@ -124,6 +126,7 @@ def generate_image_task(
         ]
         
         actual_num = max(1, num_images)
+        logger.info(f"[v0] Will generate {actual_num} images (num_images param was {num_images})")
         
         for i in range(actual_num):
             # Agregar variación sutil al prompt para cada imagen
