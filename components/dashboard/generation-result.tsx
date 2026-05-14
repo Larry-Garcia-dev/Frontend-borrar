@@ -12,7 +12,8 @@ import {
   Copy,
   ChevronDown,
   Info,
-  Edit3
+  Edit3,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ParticleLoader } from "@/components/ui/particle-loader";
@@ -30,7 +31,8 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
   const { 
     isGenerating, 
     progress, 
-    currentGeneration, 
+    currentGeneration,
+    currentGenerations,
     width, 
     height, 
     approveMedia,
@@ -38,35 +40,51 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
     isExplicitMode
   } = useGenerationStore();
 
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const isApproved = currentGeneration?.is_approved || false;
+  // Usar currentGenerations si hay múltiples, sino currentGeneration
+  const images = currentGenerations.length > 0 
+    ? currentGenerations 
+    : (currentGeneration ? [currentGeneration] : []);
+  
+  const selectedImage = images[selectedIndex] || null;
+  const isApproved = selectedImage?.is_approved || false;
 
-  const handleDownload = () => {
-    if (!currentGeneration || !isApproved) return;
+  const handleDownload = (imageIndex?: number) => {
+    const image = imageIndex !== undefined ? images[imageIndex] : selectedImage;
+    if (!image || !image.is_approved) return;
     const link = document.createElement("a");
-    link.href = currentGeneration.storage_url;
-    link.download = `macondo-${currentGeneration.id}.png`;
+    link.href = image.storage_url;
+    link.download = `macondo-${image.id}.png`;
     link.click();
   };
 
   const handleCopyPrompt = () => {
-    if (currentGeneration?.prompt) {
-      navigator.clipboard.writeText(currentGeneration.prompt);
+    if (selectedImage?.prompt) {
+      navigator.clipboard.writeText(selectedImage.prompt);
       setCopiedPrompt(true);
       setTimeout(() => setCopiedPrompt(false), 2000);
     }
   };
 
+  const handleApproveImage = async (index: number) => {
+    const image = images[index];
+    if (image) {
+      await approveMedia(image.id);
+    }
+  };
+
   const handleGenerateEdit = async (hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, newWidth: number, newHeight: number, numImages: number) => {
-    if (!currentGeneration) return;
-    await generateEdit(currentGeneration.id, hiddenPrompt, negativePrompt, clothingText, customPrompt, newWidth, newHeight, numImages);
+    if (!selectedImage) return;
+    await generateEdit(selectedImage.id, hiddenPrompt, negativePrompt, clothingText, customPrompt, newWidth, newHeight, numImages);
+    setSelectedIndex(0); // Reset al primer resultado
   };
 
   // Estado vacío - sin generación
-  if (!isGenerating && !currentGeneration) {
+  if (!isGenerating && images.length === 0) {
     return (
       <motion.div 
         initial={{ opacity: 0, x: 20 }} 
@@ -79,7 +97,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20">
               <ImageIcon className="h-10 w-10 text-primary" />
             </div>
-            <h3 className="text-xl font-semibold text-foreground">Tu imagen aparecerá aquí</h3>
+            <h3 className="text-xl font-semibold text-foreground">Tu imagen aparecera aqui</h3>
             <p className="mt-2 text-muted-foreground">Escribe un prompt y presiona generar</p>
           </div>
         </div>
@@ -88,7 +106,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
   }
 
   // Estado de carga
-  if (isGenerating && !currentGeneration) {
+  if (isGenerating && images.length === 0) {
     return (
       <motion.div 
         initial={{ opacity: 0, x: 20 }} 
@@ -97,13 +115,13 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
         className="w-full lg:w-1/2"
       >
         <div className="flex h-full min-h-[500px] items-center justify-center rounded-2xl border border-border bg-card/50">
-          <ParticleLoader message="Creando tu imagen..." progress={progress} />
+          <ParticleLoader message="Creando tus imagenes..." progress={progress} />
         </div>
       </motion.div>
     );
   }
 
-  // Vista con imagen generada - Layout de 2 columnas
+  // Vista con imágenes generadas
   return (
     <>
       <motion.div 
@@ -113,31 +131,82 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
         className="w-full lg:w-1/2"
       >
         <div className="flex flex-col lg:flex-row gap-4 h-full">
-          {/* Columna izquierda - Imagen (65%) */}
-          <div className="lg:w-[65%] flex flex-col">
+          {/* Columna izquierda - Imagen principal y miniaturas */}
+          <div className="lg:w-[65%] flex flex-col gap-4">
+            {/* Imagen principal seleccionada */}
             <div className="relative flex-1 overflow-hidden rounded-2xl border border-border bg-secondary/30">
               <AnimatePresence mode="wait">
-                {currentGeneration && (
+                {selectedImage && (
                   <motion.div 
-                    key="result" 
+                    key={selectedImage.id} 
                     initial={{ opacity: 0, scale: 0.95 }} 
                     animate={{ opacity: 1, scale: 1 }} 
                     exit={{ opacity: 0, scale: 0.95 }} 
-                    className="relative h-full min-h-[400px] lg:min-h-[500px]"
+                    className="relative h-full min-h-[350px] lg:min-h-[400px]"
                   >
                     <ProtectedImage
-                      src={currentGeneration.storage_url}
-                      alt={currentGeneration.prompt}
+                      src={selectedImage.storage_url}
+                      alt={selectedImage.prompt}
                       className="h-full w-full object-contain"
                       isApproved={isApproved}
                     />
+                    {/* Badge de selección */}
+                    <div className="absolute top-3 left-3 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium">
+                      Imagen {selectedIndex + 1} de {images.length}
+                    </div>
+                    {/* Badge de aprobación */}
+                    {isApproved && (
+                      <div className="absolute top-3 right-3 bg-green-500/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium text-white flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Aprobada
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Miniaturas de las 3 imágenes */}
+            {images.length > 1 && (
+              <div className="grid grid-cols-3 gap-3">
+                {images.map((image, index) => (
+                  <button
+                    key={image.id}
+                    onClick={() => setSelectedIndex(index)}
+                    className={cn(
+                      "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
+                      selectedIndex === index 
+                        ? "border-primary ring-2 ring-primary/30 scale-[1.02]" 
+                        : "border-border hover:border-primary/50"
+                    )}
+                  >
+                    <img
+                      src={image.storage_url}
+                      alt={`Opcion ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Overlay con número */}
+                    <div className={cn(
+                      "absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                      selectedIndex === index 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-background/80 text-foreground"
+                    )}>
+                      {index + 1}
+                    </div>
+                    {/* Indicador de aprobación */}
+                    {image.is_approved && (
+                      <div className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                        <Check className="h-3 w-3 text-white" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Columna derecha - Panel de información (35%) */}
+          {/* Columna derecha - Panel de información */}
           <div className="lg:w-[35%] flex flex-col gap-4">
             {/* Sección PROMPT */}
             <div className="rounded-xl border border-border bg-card p-4">
@@ -161,7 +230,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                 </button>
               </div>
               <p className="text-sm text-foreground leading-relaxed line-clamp-4">
-                {currentGeneration?.prompt}
+                {selectedImage?.prompt}
               </p>
             </div>
 
@@ -173,7 +242,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
               >
                 <span className="flex items-center gap-2">
                   <Info className="h-4 w-4" />
-                  INFORMACIÓN
+                  INFORMACION
                 </span>
                 <ChevronDown className={cn(
                   "h-4 w-4 transition-transform",
@@ -199,13 +268,17 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                         <span className="text-sm font-medium text-primary">1k</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Tamaño</span>
+                        <span className="text-sm text-muted-foreground">Tamano</span>
                         <span className="text-sm font-medium text-foreground">{width}x{height}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Ediciones</span>
-                        <span className="text-sm font-medium text-foreground">
-                          {currentGeneration?.edit_count || 0} / 2
+                        <span className="text-sm text-muted-foreground">Imagenes</span>
+                        <span className="text-sm font-medium text-foreground">{images.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Aprobadas</span>
+                        <span className="text-sm font-medium text-green-500">
+                          {images.filter(i => i.is_approved).length} / {images.length}
                         </span>
                       </div>
                     </div>
@@ -215,7 +288,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
             </div>
 
             {/* Advertencia de imagen protegida */}
-            {!isApproved && currentGeneration && (
+            {!isApproved && selectedImage && (
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500 shrink-0" />
@@ -236,27 +309,46 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                   <Button 
                     variant="default" 
                     className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-                    onClick={() => currentGeneration && approveMedia(currentGeneration.id)}
+                    onClick={() => handleApproveImage(selectedIndex)}
                   >
                     <Check className="mr-2 h-4 w-4" />
-                    Aprobar imagen
+                    Aprobar imagen {selectedIndex + 1}
                   </Button>
+                  
+                  {/* Botón para aprobar todas */}
+                  {images.length > 1 && images.some(i => !i.is_approved) && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-green-500/30 text-green-600 hover:bg-green-500/10"
+                      onClick={async () => {
+                        for (let i = 0; i < images.length; i++) {
+                          if (!images[i].is_approved) {
+                            await handleApproveImage(i);
+                          }
+                        }
+                      }}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Aprobar todas ({images.filter(i => !i.is_approved).length})
+                    </Button>
+                  )}
+                  
                   <Button 
                     variant="secondary" 
                     className="w-full"
                     onClick={() => setShowEditModal(true)}
-                    disabled={(currentGeneration?.edit_count || 0) >= 2}
+                    disabled={(selectedImage?.edit_count || 0) >= 2}
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Editar imagen
-                    {(currentGeneration?.edit_count || 0) >= 2 && (
-                      <span className="ml-2 text-xs opacity-70">(límite alcanzado)</span>
+                    {(selectedImage?.edit_count || 0) >= 2 && (
+                      <span className="ml-2 text-xs opacity-70">(limite alcanzado)</span>
                     )}
                   </Button>
                   <Button 
                     variant="outline" 
                     className="w-full"
-                    onClick={() => currentGeneration && onOpenReport(currentGeneration.id)}
+                    onClick={() => selectedImage && onOpenReport(selectedImage.id)}
                   >
                     <Flag className="mr-2 h-4 w-4" />
                     Reportar problema
@@ -267,11 +359,30 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                   <Button 
                     variant="gradient" 
                     className="w-full"
-                    onClick={handleDownload}
+                    onClick={() => handleDownload()}
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar imagen
                   </Button>
+                  
+                  {/* Descargar todas las aprobadas */}
+                  {images.filter(i => i.is_approved).length > 1 && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        images.forEach((img, idx) => {
+                          if (img.is_approved) {
+                            setTimeout(() => handleDownload(idx), idx * 500);
+                          }
+                        });
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Descargar todas ({images.filter(i => i.is_approved).length})
+                    </Button>
+                  )}
+                  
                   <Button 
                     variant="outline" 
                     className="w-full"
@@ -279,7 +390,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
                     disabled={isGenerating}
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    Nueva generación
+                    Nueva generacion
                   </Button>
                 </>
               )}
@@ -289,11 +400,11 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
       </motion.div>
 
       {/* Modal de edición */}
-      {currentGeneration && (
+      {selectedImage && (
         <EditModal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
-          image={currentGeneration}
+          image={selectedImage}
           onGenerate={handleGenerateEdit}
           maxEdits={2}
           isExplicit={isExplicitMode}
