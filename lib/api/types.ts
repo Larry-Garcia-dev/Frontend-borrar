@@ -32,6 +32,7 @@ export interface ExplicitGenerationRequest {
   additional_prompt?: string;  // Instrucciones adicionales opcionales
   width?: number;
   height?: number;
+  num_images?: number;  // Cantidad de imágenes a generar (1-10)
 }
 
 export interface GenerationTaskResponse {

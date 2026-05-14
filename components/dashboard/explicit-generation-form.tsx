@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, RefreshCw, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { ModelProfile } from "@/lib/api/types";
@@ -71,6 +72,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [additionalPrompt, setAdditionalPrompt] = useState<string>("");
   const [randomSeed, setRandomSeed] = useState(0);
+  const [numImages, setNumImages] = useState(3);
 
   const trainingPhotos = modelProfile.explicit_training_photos || [];
 
@@ -140,6 +142,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
+        num_images: numImages, // Cantidad de imágenes a generar
       });
     } catch (err: any) {
       console.error("[v0] Explicit generation error:", err);
@@ -470,6 +473,32 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Selector de Cantidad de Imágenes */}
+                <div className="space-y-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Images className="h-4 w-4 text-rose-400" />
+                      Cantidad de imágenes
+                    </label>
+                    <span className="rounded-full bg-rose-500/20 px-3 py-1 text-sm font-semibold text-rose-300">
+                      {numImages} {numImages === 1 ? "imagen" : "imágenes"}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[numImages]}
+                    onValueChange={(value) => setNumImages(value[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>1</span>
+                    <span>5</span>
+                    <span>10</span>
                   </div>
                 </div>
 
