@@ -46,35 +46,58 @@ export function selectRandomPhotos(photos: string[], count: number = 4): string[
 /**
  * Convierte una URL de imagen local o remota a Data URI Base64 compatible con DashScope.
  * Redimensiona si excede el limite de 9MB.
+ * 
+ * TRAINING_PHOTOS_PATH debe apuntar a la carpeta raiz donde estan las fotos.
+ * Por ejemplo: ../vendor-service/models/training
  */
 export async function urlToBase64DataUri(url: string): Promise<string> {
   let imageBuffer: Buffer;
+
+  console.log('[storage-util] urlToBase64DataUri called with:', url);
+  console.log('[storage-util] TRAINING_PHOTOS_PATH:', env.TRAINING_PHOTOS_PATH);
 
   // Si es URL local (archivo en el servidor)
   if (url.startsWith('/') || url.startsWith('./') || url.startsWith(env.TRAINING_PHOTOS_PATH)) {
     let localPath: string;
     
-    // Si la URL ya contiene /models/training/, usar ruta relativa desde el directorio actual
+    // La URL viene como /models/training/user/file.jpg
+    // Necesitamos construir la ruta real usando TRAINING_PHOTOS_PATH
     if (url.startsWith('/models/training/')) {
-      // Quitar el / inicial para hacerlo relativo
-      localPath = '.' + url;
+      // Extraer la parte despues de /models/training/
+      const relativePart = url.replace('/models/training/', '');
+      localPath = path.join(env.TRAINING_PHOTOS_PATH, relativePart);
     } else if (url.startsWith('/media/')) {
       localPath = path.join(env.TRAINING_PHOTOS_PATH, url.replace('/media/', ''));
     } else if (url.startsWith('./')) {
       localPath = url;
     } else if (url.startsWith('/')) {
-      // Otras rutas absolutas - intentar como relativas
-      localPath = '.' + url;
+      // Otras rutas absolutas
+      const relativePart = url.substring(1); // quitar el /
+      localPath = path.join(env.TRAINING_PHOTOS_PATH, relativePart);
     } else {
       localPath = url;
     }
     
+    // Normalizar la ruta para el sistema operativo
+    localPath = path.normalize(localPath);
+    
     console.log('[storage-util] Resolved local path:', localPath);
+    console.log('[storage-util] File exists:', fs.existsSync(localPath));
     
     if (!fs.existsSync(localPath)) {
-      throw new Error(`Archivo no encontrado: ${localPath}`);
+      // Intentar ruta alternativa - buscar en el directorio actual
+      const altPath = path.join(process.cwd(), url.startsWith('/') ? url.substring(1) : url);
+      console.log('[storage-util] Trying alternative path:', altPath);
+      
+      if (fs.existsSync(altPath)) {
+        localPath = altPath;
+        console.log('[storage-util] Found at alternative path');
+      } else {
+        throw new Error(`Archivo no encontrado: ${localPath} (tambien intentado: ${altPath})`);
+      }
     }
     imageBuffer = fs.readFileSync(localPath);
+    console.log('[storage-util] File read successfully, size:', imageBuffer.length);
   } else if (url.startsWith('http')) {
     // URL remota
     const response = await fetch(url);
