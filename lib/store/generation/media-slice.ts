@@ -23,7 +23,10 @@ export const createMediaSlice: StateCreator<GenerationStore, [], [], MediaSlice>
     try {
       const templates = await api.getPromptTemplates();
       set({ promptTemplates: templates });
-    } catch { /* Fail */ }
+    } catch (error) { 
+      // Silently fail - prompt templates are optional
+      console.log("[v0] fetchPromptTemplates: endpoint not available, skipping");
+    }
   },
 
   approveMedia: async (mediaId) => {

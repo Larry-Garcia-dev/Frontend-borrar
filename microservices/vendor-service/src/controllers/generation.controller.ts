@@ -3,6 +3,7 @@ import { prisma } from '../repositories/prisma.client';
 import { AuthRequest } from '../middlewares/studio.middleware';
 
 const GENERATION_SERVICE_URL = process.env.GENERATION_SERVICE_URL || 'http://localhost:3003';
+const INTERNAL_SERVICE_SECRET = process.env.INTERNAL_SERVICE_SECRET || 'internal-service-secret';
 
 export class GenerationController {
   static async triggerGenerationFromStudio(req: AuthRequest, res: Response): Promise<void> {
@@ -11,9 +12,11 @@ export class GenerationController {
     
     try {
       const studioId = req.user.id;
+      const studioEmail = req.user.email;
       const { model_user_id, prompt, is_explicit, num_images, width, height } = req.body;
 
       console.log('[vendor-service] Studio ID:', studioId);
+      console.log('[vendor-service] Studio Email:', studioEmail);
       console.log('[vendor-service] Model User ID:', model_user_id);
 
       // 1. Validar que la modelo pertenece al estudio
@@ -36,15 +39,18 @@ export class GenerationController {
         return;
       }
 
-      // 3. Llamar al generation-service
+      // 3. Llamar al generation-service con headers internos
       console.log('[vendor-service] Calling generation-service at:', GENERATION_SERVICE_URL);
       
-      const token = req.headers.authorization;
       const generationResponse = await fetch(`${GENERATION_SERVICE_URL}/api/generation/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': token } : {}),
+          'X-Internal-Service-Secret': INTERNAL_SERVICE_SECRET,
+          'X-User-Id': studioId,
+          'X-User-Email': studioEmail,
+          'X-User-Role': 'ESTUDIO',
+          'X-Studio-Id': studioId,
         },
         body: JSON.stringify({
           model_user_id,
