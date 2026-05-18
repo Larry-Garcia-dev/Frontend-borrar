@@ -1,19 +1,41 @@
 import { Router } from 'express';
-import { VendorStudioController } from '../controllers/vendor.controller';
-import { GenerationVendorController } from '../controllers/generation.vendor.controller';
 import { studioMiddleware } from '../middlewares/studio.middleware';
+import { UserController } from '../controllers/user.controller';
+import { ModelController } from '../controllers/model.controller';
+import { UploadController } from '../controllers/upload.controller';
+import { GenerationController } from '../controllers/generation.controller';
+import { upload } from '../config/multer.config';
 
 const router = Router();
 
+// Middleware de autenticacion para todas las rutas
 router.use(studioMiddleware);
 
-// Rutas de Generación e Inyección
-router.get('/my-models-select', VendorStudioController.getModelsForSelect);
-router.post('/generate-for-model', GenerationVendorController.triggerGenerationFromStudio);
+// =====================
+// Rutas de Usuarios
+// =====================
+router.get('/users', UserController.list);
+router.post('/users', UserController.create);
+router.patch('/users/:userId', UserController.update);
+router.delete('/users/:userId', UserController.delete);
 
-// Nuevas rutas de gestión de modelos portadas al microservicio
-router.post('/request-creation', VendorStudioController.requestModelCreation);
-router.get('/my-requests', VendorStudioController.getMyModelRequests);
-router.get('/my-models', VendorStudioController.getMyModels);
+// =====================
+// Rutas de Modelos
+// =====================
+router.post('/request-creation', ModelController.requestCreation);
+router.get('/my-requests', ModelController.getMyRequests);
+router.get('/my-models', ModelController.getMyModels);
+router.get('/my-models-select', ModelController.getModelsForSelect);
+router.post('/profiles/:profileId/toggle-status', ModelController.toggleStatus);
+
+// =====================
+// Rutas de Upload
+// =====================
+router.post('/upload-photos', upload.array('files', 20), UploadController.uploadPhotos);
+
+// =====================
+// Rutas de Generacion
+// =====================
+router.post('/generate-for-model', GenerationController.triggerGenerationFromStudio);
 
 export default router;

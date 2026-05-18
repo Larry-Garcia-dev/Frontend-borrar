@@ -89,3 +89,69 @@ model PromptTemplate {
 
   @@map("prompt_templates")
 }
+
+model ModelCreationRequest {
+  id                       String    @id @default(uuid()) @db.Uuid
+  studio_id                String    @db.Uuid
+  model_email              String    @db.VarChar(320)
+  model_name               String    @db.VarChar(255)
+  model_phone              String?   @db.VarChar(50)
+  training_photos          Json      @default("[]")
+  is_explicit              Boolean   @default(false)
+  explicit_training_photos Json      @default("[]")
+  model_info               Json      @default("{}")
+  status                   String    @default("PENDING") @db.VarChar(30)
+  payment_required         Boolean   @default(true)
+  payment_amount_usd       Decimal?  @db.Decimal(10, 2)
+  payment_completed        Boolean   @default(false)
+  payment_completed_at     DateTime? @db.Timestamptz
+  rejection_reason         String?   @db.Text
+  reviewed_by_id           String?   @db.Uuid
+  reviewed_at              DateTime? @db.Timestamptz
+  created_user_id          String?   @db.Uuid
+  created_at               DateTime  @default(now()) @db.Timestamptz
+  updated_at               DateTime  @default(now()) @db.Timestamptz
+
+  @@map("model_creation_requests")
+}
+
+model ModelProfile {
+  id                       String    @id @default(uuid()) @db.Uuid
+  user_id                  String    @db.Uuid
+  studio_id                String?   @db.Uuid
+  display_name             String    @db.VarChar(255)
+  bio                      String?   @db.Text
+  age                      Int?
+  gender                   String?   @db.VarChar(50)
+  ethnicity                String?   @db.VarChar(100)
+  hair_color               String?   @db.VarChar(50)
+  eye_color                String?   @db.VarChar(50)
+  height_cm                Int?
+  training_photos          Json      @default("[]")
+  is_explicit              Boolean   @default(false)
+  explicit_training_photos Json      @default("[]")
+  ai_model_id              String?   @db.VarChar(255)
+  status                   String    @default("PENDING") @db.VarChar(30)
+  rejection_reason         String?   @db.Text
+  images_per_order         Int       @default(10)
+  created_at               DateTime  @default(now()) @db.Timestamptz
+  updated_at               DateTime  @default(now()) @db.Timestamptz
+
+  @@map("model_profiles")
+}
+
+model Notification {
+  id                  String    @id @default(uuid()) @db.Uuid
+  user_id             String    @db.Uuid
+  notification_type   String    @db.VarChar(50)
+  title               String    @db.VarChar(255)
+  message             String    @db.Text
+  related_entity_type String?   @db.VarChar(50)
+  related_entity_id   String?   @db.Uuid
+  metadata            Json      @default("{}")
+  is_read             Boolean   @default(false)
+  read_at             DateTime? @db.Timestamptz
+  created_at          DateTime  @default(now()) @db.Timestamptz
+
+  @@map("notifications")
+}
