@@ -1,6 +1,7 @@
 import { StateCreator } from "zustand";
 import { GenerationStore, ExecutionSlice } from "./types";
-import { api, GenerationRequest, resolveMediaUrl } from "@/lib/api-client";
+import { api, GenerationRequest, resolveMediaUrl, GeneratedMedia } from "@/lib/api-client";
+import { resolveVendorMediaUrl } from "@/lib/api/config";
 
 export const createExecutionSlice: StateCreator<GenerationStore, [], [], ExecutionSlice> = (set, get) => ({
   currentGeneration: null,
@@ -43,24 +44,23 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
   },
 
   generateForModel: async (modelUserId: string) => {
-    console.log("[v0] execution-slice: generateForModel called");
-    console.log("[v0] execution-slice: modelUserId:", modelUserId);
-    
     const state = get();
-    console.log("[v0] execution-slice: prompt:", state.prompt);
-    console.log("[v0] execution-slice: numImages:", state.numImages);
-    console.log("[v0] execution-slice: isExplicitMode:", state.isExplicitMode);
     
     if (!state.prompt.trim()) { 
-      console.log("[v0] execution-slice: ERROR - No prompt");
       set({ error: "Ingresa un prompt" }); 
       return null; 
     }
     
-    set({ isGenerating: true, error: null, progress: 0, taskStatus: "queued" });
+    set({ 
+      isGenerating: true, 
+      error: null, 
+      progress: 0, 
+      taskStatus: "queued",
+      currentGeneration: null,
+      currentGenerations: [],
+    });
     
     try {
-      console.log("[v0] execution-slice: Calling api.triggerGenerationFromStudio...");
       const result = await api.triggerGenerationFromStudio({
         model_user_id: modelUserId,
         prompt: state.prompt,
@@ -69,12 +69,35 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
         width: state.width,
         height: state.height,
       });
-      console.log("[v0] execution-slice: API result:", result);
-      set({ isGenerating: false, progress: 100, taskStatus: "success" });
-      return result;
+      
+      // Transformar la respuesta del backend a GeneratedMedia[]
+      // El backend devuelve: { id, storage_urls: string[], prompt, created_at, count }
+      const generatedImages: GeneratedMedia[] = (result.storage_urls || []).map((url: string, index: number) => ({
+        id: index === 0 ? result.id : `${result.id}-${index}`,
+        storage_url: resolveVendorMediaUrl(url),
+        prompt: result.prompt || state.prompt,
+        original_prompt: result.prompt || state.prompt,
+        media_type: 'image',
+        created_at: result.created_at || new Date().toISOString(),
+        is_approved: false,
+        edit_count: 0,
+      }));
+      
+      if (generatedImages.length > 0) {
+        set({ 
+          currentGeneration: generatedImages[0],
+          currentGenerations: generatedImages,
+          generations: [...generatedImages, ...get().generations],
+          isGenerating: false, 
+          progress: 100, 
+          taskStatus: "success" 
+        });
+        return generatedImages[0];
+      }
+      
+      set({ isGenerating: false, progress: 0, taskStatus: "" }); 
+      return null;
     } catch (e: any) { 
-      console.error("[v0] execution-slice: ERROR:", e);
-      console.error("[v0] execution-slice: Error message:", e.message);
       set({ error: e.message, isGenerating: false, progress: 0, taskStatus: "failure" }); 
       return null; 
     }

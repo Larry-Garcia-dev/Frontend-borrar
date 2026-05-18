@@ -161,7 +161,7 @@ export function EditModal({
       await onGenerate(hiddenPrompt, negativePrompt, clothingText, customPrompt, selectedSize.width, selectedSize.height, numImages);
       onClose();
     } catch (error) {
-      console.error("[v0] Error generating edit:", error);
+      // Handle error silently
     } finally {
       setIsGenerating(false);
     }
