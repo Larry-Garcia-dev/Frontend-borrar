@@ -13,4 +13,8 @@ export const env = {
   // Storage paths
   STORAGE_PATH: process.env.STORAGE_PATH || './generadas',
   TRAINING_PHOTOS_PATH: process.env.TRAINING_PHOTOS_PATH || './models/training',
+  
+  // Watermark configuration
+  WATERMARK_TEXT: process.env.WATERMARK_TEXT || 'macondo-ia.com',
+  WATERMARK_ENABLED: process.env.WATERMARK_ENABLED !== 'false', // enabled by default
 };
