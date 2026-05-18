@@ -43,5 +43,7 @@ router.get('/prompt-templates', PromptController.getPromptTemplates);
 router.post('/prompt-templates', PromptController.createPromptTemplate);
 router.patch('/prompt-templates/:id', PromptController.togglePromptTemplate);
 router.delete('/prompt-templates/:id', PromptController.deletePromptTemplate);
+router.get('/users-cost', UserController.getUsersCost);
+router.get('/users/:id/media', UserController.getUserMedia);
 
 export default router;

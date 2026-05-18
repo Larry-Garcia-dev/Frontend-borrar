@@ -38,4 +38,39 @@ export class UserRepository {
   static async deleteUser(id: string) {
     return prisma.user.delete({ where: { id } });
   }
+  // Añade estos métodos al final de tu UserRepository
+  static async getUsersCost() {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        media: { select: { cost_usd: true } },
+        _count: { select: { media: true } }
+      }
+    });
+
+    // Mapeamos y sumamos los costos de forma segura
+    return users.map(u => ({
+      user_id: u.id,
+      email: u.email,
+      total_cost_usd: u.media.reduce((acc, m) => acc + Number(m.cost_usd || 0), 0),
+      media_count: u._count.media
+    })).sort((a, b) => b.total_cost_usd - a.total_cost_usd); // Ordenar por mayor gasto
+  }
+
+  static async getUserMedia(userId: string) {
+    return prisma.media.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        media_type: true,
+        original_prompt: true,
+        storage_url: true,
+        created_at: true,
+        cost_usd: true,
+        model_used: true
+      }
+    });
+  }
 }

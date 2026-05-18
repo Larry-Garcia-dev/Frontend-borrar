@@ -57,4 +57,9 @@ export class UserService {
     await UserRepository.deleteUser(userId);
     return true;
   }
+
+  // Añade estos métodos
+  static async getUsersCost() { return UserRepository.getUsersCost(); }
+  static async getUserMedia(userId: string) { return UserRepository.getUserMedia(userId); }
+
 }

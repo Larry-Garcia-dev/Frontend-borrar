@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String    @id @default(uuid()) @db.Uuid
+  email                 String    @unique @db.VarChar(320)
+  google_id             String?   @unique @db.VarChar(255)
+  password_hash         String?   @db.VarChar(255)
+  name                  String?   @db.VarChar(255)
+  phone                 String?   @db.VarChar(50)
+  avatar_url            String?   @db.VarChar(2048)
+  role                  String    @default("MODELO") @db.VarChar(20)
+  user_type             String?   @db.VarChar(30)
+  daily_limit           Int       @default(10)
+  used_quota            Int       @default(0)
+  is_unlimited          Boolean   @default(false)
+  quota_reset_at        DateTime? @db.Timestamptz
+  max_models_limit      Int       @default(5)
+  studio_id             String?   @db.Uuid
+  vendor_id             String?   @db.Uuid
+  is_active             Boolean   @default(true)
+  is_approved           Boolean   @default(false)
+  approved_at           DateTime? @db.Timestamptz
+  approved_by_id        String?   @db.Uuid
+  chat_authorized       Boolean   @default(false)
+  chat_authorized_at    DateTime? @db.Timestamptz
+  chat_authorized_by_id String?   @db.Uuid
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  updated_at            DateTime? @db.Timestamptz
+
+  @@map("users")
+}
+
+model Media {
+  id               String    @id @default(uuid()) @db.Uuid
+  user_id          String    @db.Uuid
+  media_type       String    @db.VarChar(50)
+  prompt           String    @db.Text
+  original_prompt  String    @db.Text
+  storage_url      String    @db.VarChar(2048)
+  cost_usd         Decimal?  @db.Decimal(10, 6)
+  model_used       String?   @db.VarChar(100)
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  
+  @@map("media")
+}
+
+model ImageReport {
+  id               String    @id @default(uuid()) @db.Uuid
+  media_id         String    @db.Uuid
+  user_id          String    @db.Uuid
+  reason           String    @db.Text
+  status           String    @default("PENDING") @db.VarChar(20)
+  admin_note       String?   @db.Text
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  reviewed_at      DateTime? @db.Timestamptz
+
+  @@map("image_reports")
+}
+
+model SystemPrompt {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255)
+  content     String   @db.Text
+  is_active   Boolean  @default(false)
+  created_by  String   @db.VarChar(320)
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+
+  @@map("system_prompts")
+}
+
+model PromptTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(255)
+  content     String   @db.Text
+  description String?  @db.VarChar(500)
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_by  String   @db.VarChar(320)
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @default(now()) @db.Timestamptz
+
+  @@map("prompt_templates")
+}

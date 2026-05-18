@@ -1,9 +1,11 @@
 import { 
   API_BASE_URL, 
   API_AUTH_BASE_URL, 
+  API_VENDOR_BASE_URL, // <--- AÑADIDO AQUÍ
   API_ADMIN_BASE_URL, 
   API_PREFIX, 
   API_PREFIX_ADMIN, 
+  API_PREFIX_VENDOR,   // <--- AÑADIDO AQUÍ
   getTokenFromCookie, 
   setTokenCookie 
 } from './config';
@@ -54,6 +56,8 @@ export class BaseAPIClient {
       baseUrl = API_AUTH_BASE_URL; // Puerto 4000 (Auth Node.js)
     } else if (usePrefix === API_PREFIX_ADMIN) {
       baseUrl = API_ADMIN_BASE_URL; // Puerto 4001 (Admin Node.js)
+    } else if (usePrefix === API_PREFIX_VENDOR) {
+      baseUrl = API_VENDOR_BASE_URL; // NUEVO: Puerto 4002 (Vendor Node.js)
     }
 
     const response = await fetch(`${baseUrl}${usePrefix}${endpoint}`, {

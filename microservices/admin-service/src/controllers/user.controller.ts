@@ -38,4 +38,15 @@ export class UserController {
     try { await UserService.deleteUser(req.params.id); res.status(204).send(); } 
     catch (e: any) { res.status(400).json({ detail: e.message }); }
   }
+
+  // Añade estos métodos al UserController
+  static async getUsersCost(req: Request, res: Response) {
+    try { res.json(await UserService.getUsersCost()); } 
+    catch (e: any) { res.status(500).json({ detail: e.message }); }
+  }
+
+  static async getUserMedia(req: Request, res: Response) {
+    try { res.json(await UserService.getUserMedia(req.params.id)); } 
+    catch (e: any) { res.status(500).json({ detail: e.message }); }
+  }
 }
