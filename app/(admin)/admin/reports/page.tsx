@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, UserPlus, Check, X, DollarSign, Image as ImageIcon } from "lucide-react";
+import { AlertTriangle, UserPlus, Check, X, DollarSign, Image as ImageIcon, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ImageModal } from "@/components/ui/image-modal";
 import { useAdminStore } from "@/lib/store/admin-store";
+import { resolveVendorMediaUrl } from "@/lib/api/config";
 import { formatDate, cn } from "@/lib/utils";
 
 export default function AdminReportsPage() {
@@ -25,6 +27,17 @@ export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState<"models" | "reports">("models");
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  
+  // Estado para el modal de imágenes
+  const [modalImages, setModalImages] = useState<string[]>([]);
+  const [modalIndex, setModalIndex] = useState(0);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openImageModal = (images: string[], index: number) => {
+    setModalImages(images.map(img => resolveVendorMediaUrl(img)));
+    setModalIndex(index);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     fetchReports();
@@ -136,12 +149,30 @@ export default function AdminReportsPage() {
                           <p className="text-sm text-muted-foreground">Email: {req.model_email} | Estudio ID: {req.studio_id.slice(0,8)}...</p>
                           <p className="text-sm text-muted-foreground">Fecha: {formatDate(req.created_at)}</p>
                           
-                          {/* Fotos Previas */}
+                          {/* Fotos Previas - Clickeables para abrir modal */}
                           {req.training_photos?.length > 0 && (
-                            <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                              {req.training_photos.map((photo, i) => (
-                                <img key={i} src={photo} alt="Training preview" className="h-16 w-16 object-cover rounded-lg flex-shrink-0 border" />
-                              ))}
+                            <div className="mt-4">
+                              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                <ZoomIn className="h-4 w-4" /> Fotos de entrenamiento ({req.training_photos.length})
+                              </p>
+                              <div className="flex gap-2 overflow-x-auto pb-2">
+                                {req.training_photos.map((photo, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => openImageModal(req.training_photos, i)}
+                                    className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0 border hover:border-primary hover:ring-2 hover:ring-primary/20 transition-all group"
+                                  >
+                                    <img 
+                                      src={resolveVendorMediaUrl(photo)} 
+                                      alt={`Foto ${i + 1}`} 
+                                      className="h-full w-full object-cover" 
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                      <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -261,6 +292,15 @@ export default function AdminReportsPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Modal de Imágenes */}
+      <ImageModal
+        images={modalImages}
+        currentIndex={modalIndex}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onNavigate={setModalIndex}
+      />
     </div>
   );
 }
