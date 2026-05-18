@@ -59,6 +59,7 @@ export interface ExecutionSlice {
   taskStatus: string;
   taskId: string | null;
   generate: () => Promise<GeneratedMedia | null>;
+  generateForModel: (modelUserId: string) => Promise<any>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
   generateEdit: (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number) => Promise<GeneratedMedia[] | null>;
   clearError: () => void;
