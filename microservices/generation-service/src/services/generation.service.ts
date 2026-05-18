@@ -11,6 +11,7 @@ import {
   ensureDirectoryExists, 
   urlToBase64DataUri,
 } from '../utils/storage.util';
+import { WatermarkService } from './watermark.service';
 
 // Modelos de Alibaba
 const TEXT_TO_IMAGE_MODEL = 'wan2.6-image';
@@ -197,6 +198,24 @@ export class GenerationService {
         const fileName = `${uuidv4()}.${ext}`;
         const fullPath = path.join(outputPath, fileName);
         fs.writeFileSync(fullPath, imageBytes);
+
+        // 6.1 Aplicar marca de agua (si esta habilitada)
+        if (env.WATERMARK_ENABLED) {
+          console.log('[generation-service] Applying watermark to image...');
+          try {
+            await WatermarkService.applyWatermark(fullPath, undefined, {
+              text: env.WATERMARK_TEXT,
+              position: 'center',
+              opacity: 0.6,
+            });
+            console.log('[generation-service] Watermark applied successfully');
+          } catch (watermarkError: any) {
+            console.error('[generation-service] WARNING: Failed to apply watermark:', watermarkError.message);
+            // Continuar sin marca de agua si falla
+          }
+        } else {
+          console.log('[generation-service] Watermark disabled, skipping...');
+        }
 
         const storageUrl = fullPath.replace(env.STORAGE_PATH, '/generadas');
         storageUrls.push(storageUrl);
