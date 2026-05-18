@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                  String    @id @default(uuid()) @db.Uuid
   email               String    @unique @db.VarChar(320)
   google_id           String?   @unique @db.VarChar(255)
   password_hash       String?   @db.VarChar(255)
@@ -30,7 +30,7 @@ model User {
 }
 
 model ModelCreationRequest {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                  String    @id @default(uuid()) @db.Uuid
   studio_id           String    @db.Uuid
   model_email         String    @db.VarChar(320)
   status              String    @default("PENDING") @db.VarChar(20)
@@ -39,7 +39,7 @@ model ModelCreationRequest {
 }
 
 model ActivityLog {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
   user_id       String?   @db.Uuid
   action        String    @db.VarChar(100)
   resource_type String?   @db.VarChar(50)

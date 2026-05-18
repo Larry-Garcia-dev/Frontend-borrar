@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 export const prisma = new PrismaClient();
 
@@ -34,6 +35,7 @@ export class UserRepository {
   static async createMacondoAdmin(email: string, googleId: string, name: string, avatarUrl: string) {
     return prisma.user.create({
       data: {
+        id: uuidv4(), // Inyección manual del UUID
         email,
         google_id: googleId,
         name,
@@ -61,6 +63,7 @@ export class UserRepository {
   static async logActivity(userId: string, action: string, ipAddress?: string, userAgent?: string, resourceType?: string) {
     return prisma.activityLog.create({
       data: {
+        id: uuidv4(), // Inyección manual del UUID para asegurar la creación exitosa
         user_id: userId,
         action,
         ip_address: ipAddress,
