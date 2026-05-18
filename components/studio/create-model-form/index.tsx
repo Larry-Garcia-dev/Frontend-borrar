@@ -12,6 +12,7 @@ import { ResourceStep } from "./resource-step";
 import { useAuthStore } from "@/lib/store/auth-store";
 
 interface CreateModelFormProps {
+  availableCredits: number;
   onSuccess?: () => void;
 }
 
@@ -107,6 +108,7 @@ export function CreateModelForm({ availableCredits, onSuccess }: CreateModelForm
           <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
             <ResourceStep
               assignedCredits={formData.assigned_credits}
+              availableCredits={availableCredits}
               onChange={(val) => setFormData({ ...formData, assigned_credits: val })}
             />
 

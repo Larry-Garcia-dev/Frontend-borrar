@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/store/auth-store";
 import { api } from "@/lib/api-client";
 import { ModelProfile } from "@/lib/api/types";
 import { ExplicitGenerationForm } from "./explicit-generation-form";
+import { ModelSelector } from "./model-selector";
 
 const SIZE_OPTIONS = [
   { value: "1080x1080 (1:1)", label: "1080 x 1080 (Carrusel/Cuadrado 1:1)", width: 1080, height: 1080 },
@@ -30,7 +31,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     prompt, setPrompt,
     width, height, setWidth, setHeight,
     selectedSize, setSelectedSize,
-    isGenerating, error, generate, clearError,
+    isGenerating, error, generate, generateForModel, clearError,
     promptTemplates, templateId, setTemplateId,
     referenceImageUrls, setReferenceImageUrls, uploadReferenceImages,
     parentMediaId, parentEditCount, cancelEdit,
@@ -39,8 +40,10 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   } = useGenerationStore();
   const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [selectedModelUserId, setSelectedModelUserId] = useState<string | null>(null);
   
   const isModelo = user?.role === "MODELO";
+  const isStudio = user?.role === "ESTUDIO_ADMIN" || user?.isStudioAdmin;
   const isModeloOrStudio = user?.role === "MODELO" || user?.role === "ESTUDIO_ADMIN" || user?.isStudioAdmin;
   const isEditing = !!parentMediaId;
   const editsRemaining = Math.max(0, 2 - parentEditCount);
@@ -98,8 +101,14 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
 
   const handleGenerate = async () => {
     clearError();
-    onGenerateStart(); // Resetea el estado de isApproved en el componente padre
-    await generate();
+    onGenerateStart();
+    
+    // Si es estudio y tiene modelo seleccionado, usar generateForModel
+    if (isStudio && selectedModelUserId) {
+      await generateForModel(selectedModelUserId);
+    } else {
+      await generate();
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +174,14 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                 <X className="h-4 w-4" /> Cancelar
               </Button>
             </div>
+          )}
+
+          {/* Selector de Modelo - Solo visible para estudios */}
+          {isStudio && (
+            <ModelSelector
+              selectedModelUserId={selectedModelUserId}
+              onSelect={setSelectedModelUserId}
+            />
           )}
 
           {/* 1. Prompt Principal */}

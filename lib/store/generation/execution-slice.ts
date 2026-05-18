@@ -42,6 +42,24 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
     } catch (e: any) { set({ error: e.message, isGenerating: false, progress: 0, taskStatus: "failure" }); return null; }
   },
 
+  generateForModel: async (modelUserId: string) => {
+    const state = get();
+    if (!state.prompt.trim()) { set({ error: "Ingresa un prompt" }); return null; }
+    set({ isGenerating: true, error: null, progress: 0, taskStatus: "queued" });
+    try {
+      const result = await api.triggerGenerationFromStudio({
+        model_user_id: modelUserId,
+        prompt: state.prompt,
+        is_explicit: state.isExplicitMode,
+      });
+      set({ isGenerating: false, progress: 100, taskStatus: "success" });
+      return result;
+    } catch (e: any) { 
+      set({ error: e.message, isGenerating: false, progress: 0, taskStatus: "failure" }); 
+      return null; 
+    }
+  },
+
   generateExplicit: async (data) => {
     set({ isGenerating: true, error: null, progress: 0, taskStatus: "queued", currentGeneration: null, currentGenerations: [] });
     try {
