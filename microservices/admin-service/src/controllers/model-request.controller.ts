@@ -33,12 +33,12 @@ export class ModelRequestController {
       const reason = req.query.reason as string || req.body.reason;
       
       if (!reason) {
-        res.status(400).json({ detail: 'Debe proporcionar una razón' });
+        res.status(400).json({ detail: 'Debe proporcionar una razon' });
         return;
       }
       
-      await ModelsAdminService.rejectRequest(id, adminId, reason);
-      res.json({ message: 'Solicitud rechazada' });
+      const result = await ModelsAdminService.rejectRequest(id, adminId, reason);
+      res.json(result);
     } catch (e: any) {
       res.status(400).json({ detail: e.message });
     }
@@ -47,8 +47,8 @@ export class ModelRequestController {
   static async confirmPayment(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await ModelsAdminService.confirmPayment(id);
-      res.json({ message: 'Pago confirmado' });
+      const result = await ModelsAdminService.confirmPayment(id);
+      res.json(result);
     } catch (e: any) {
       res.status(400).json({ detail: e.message });
     }

@@ -3,13 +3,17 @@ export interface GenerationRequest {
   prompt: string;
   is_explicit?: boolean;
   num_images?: number;
+  negative_prompt?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface GenerationResult {
   id: string;
-  storage_url: string;
+  storage_urls: string[];
   prompt: string;
   created_at: string;
+  count: number;
 }
 
 export interface ModelProfile {

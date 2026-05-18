@@ -43,6 +43,9 @@ export const createVendorApi = (client: BaseAPIClient) => ({
     model_user_id: string; 
     prompt: string; 
     is_explicit?: boolean;
+    num_images?: number;
+    width?: number;
+    height?: number;
   }): Promise<any> {
     return client.request<any>('/generate-for-model', { 
       method: 'POST', 

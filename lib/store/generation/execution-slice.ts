@@ -51,6 +51,9 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
         model_user_id: modelUserId,
         prompt: state.prompt,
         is_explicit: state.isExplicitMode,
+        num_images: state.numImages,
+        width: state.width,
+        height: state.height,
       });
       set({ isGenerating: false, progress: 100, taskStatus: "success" });
       return result;

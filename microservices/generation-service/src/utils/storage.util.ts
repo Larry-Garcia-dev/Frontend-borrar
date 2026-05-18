@@ -2,6 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { env } from '../config/env';
+import sharp from 'sharp';
+
+const DASHSCOPE_MAX_BYTES = 9 * 1024 * 1024; // 9MB
+const MAX_DIMENSION = 1920;
 
 export function sanitizeEmail(email: string): string {
   return email.toLowerCase()
@@ -37,4 +41,81 @@ export function generateFileName(): string {
 export function selectRandomPhotos(photos: string[], count: number = 4): string[] {
   const shuffled = [...photos].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, Math.min(count, photos.length));
+}
+
+/**
+ * Convierte una URL de imagen local o remota a Data URI Base64 compatible con DashScope.
+ * Redimensiona si excede el limite de 9MB.
+ */
+export async function urlToBase64DataUri(url: string): Promise<string> {
+  let imageBuffer: Buffer;
+
+  // Si es URL local (archivo en el servidor)
+  if (url.startsWith('/') || url.startsWith('./') || url.startsWith(env.TRAINING_PHOTOS_PATH)) {
+    const localPath = url.startsWith('/media/') 
+      ? path.join(env.TRAINING_PHOTOS_PATH, url.replace('/media/', ''))
+      : url.startsWith('/')
+        ? path.join(env.TRAINING_PHOTOS_PATH, url)
+        : url;
+    
+    if (!fs.existsSync(localPath)) {
+      throw new Error(`Archivo no encontrado: ${localPath}`);
+    }
+    imageBuffer = fs.readFileSync(localPath);
+  } else if (url.startsWith('http')) {
+    // URL remota
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Error descargando imagen: ${response.status}`);
+    }
+    imageBuffer = Buffer.from(await response.arrayBuffer());
+  } else {
+    throw new Error(`URL no soportada: ${url}`);
+  }
+
+  // Si el tamaño es aceptable, retornar directamente
+  if (imageBuffer.length <= DASHSCOPE_MAX_BYTES) {
+    const base64 = imageBuffer.toString('base64');
+    const mime = getMimeType(url) || 'image/jpeg';
+    return `data:${mime};base64,${base64}`;
+  }
+
+  // Redimensionar si es muy grande
+  let img = sharp(imageBuffer);
+  const metadata = await img.metadata();
+  
+  if (metadata.width && metadata.height) {
+    const maxDim = Math.max(metadata.width, metadata.height);
+    if (maxDim > MAX_DIMENSION) {
+      const scale = MAX_DIMENSION / maxDim;
+      img = img.resize(
+        Math.round(metadata.width * scale),
+        Math.round(metadata.height * scale)
+      );
+    }
+  }
+
+  // Comprimir como JPEG
+  let quality = 85;
+  let outputBuffer: Buffer;
+  
+  do {
+    outputBuffer = await img.jpeg({ quality }).toBuffer();
+    quality -= 15;
+  } while (outputBuffer.length > DASHSCOPE_MAX_BYTES && quality >= 20);
+
+  const base64 = outputBuffer.toString('base64');
+  return `data:image/jpeg;base64,${base64}`;
+}
+
+function getMimeType(url: string): string {
+  const ext = path.extname(url).toLowerCase();
+  const mimes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+  };
+  return mimes[ext] || 'image/jpeg';
 }
