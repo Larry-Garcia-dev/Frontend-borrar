@@ -52,11 +52,24 @@ export async function urlToBase64DataUri(url: string): Promise<string> {
 
   // Si es URL local (archivo en el servidor)
   if (url.startsWith('/') || url.startsWith('./') || url.startsWith(env.TRAINING_PHOTOS_PATH)) {
-    const localPath = url.startsWith('/media/') 
-      ? path.join(env.TRAINING_PHOTOS_PATH, url.replace('/media/', ''))
-      : url.startsWith('/')
-        ? path.join(env.TRAINING_PHOTOS_PATH, url)
-        : url;
+    let localPath: string;
+    
+    // Si la URL ya contiene /models/training/, usar ruta relativa desde el directorio actual
+    if (url.startsWith('/models/training/')) {
+      // Quitar el / inicial para hacerlo relativo
+      localPath = '.' + url;
+    } else if (url.startsWith('/media/')) {
+      localPath = path.join(env.TRAINING_PHOTOS_PATH, url.replace('/media/', ''));
+    } else if (url.startsWith('./')) {
+      localPath = url;
+    } else if (url.startsWith('/')) {
+      // Otras rutas absolutas - intentar como relativas
+      localPath = '.' + url;
+    } else {
+      localPath = url;
+    }
+    
+    console.log('[storage-util] Resolved local path:', localPath);
     
     if (!fs.existsSync(localPath)) {
       throw new Error(`Archivo no encontrado: ${localPath}`);
