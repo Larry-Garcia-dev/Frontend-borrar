@@ -5,6 +5,7 @@ import { adminMiddleware } from '../middlewares/admin.middleware';
 import { UserController } from '../controllers/user.controller';
 import { ReportController } from '../controllers/report.controller';
 import { PromptController } from '../controllers/prompt.controller';
+import { ModelRequestController } from '../controllers/model-request.controller';
 
 const router = Router();
 
@@ -30,7 +31,15 @@ router.post('/reports/:id/approve', ReportController.approveReport);
 router.post('/reports/:id/reject', ReportController.rejectReport);
 
 // ==========================================
-// 3. MÓDULO DE PROMPTS Y PLANTILLAS
+// 3. MÓDULO DE SOLICITUDES DE MODELOS
+// ==========================================
+router.get('/model-requests', ModelRequestController.getPendingRequests);
+router.post('/model-requests/:id/approve', ModelRequestController.approveRequest);
+router.post('/model-requests/:id/reject', ModelRequestController.rejectRequest);
+router.post('/model-requests/:id/confirm-payment', ModelRequestController.confirmPayment);
+
+// ==========================================
+// 4. MÓDULO DE PROMPTS Y PLANTILLAS
 // ==========================================
 // Prompt Base (System Prompts)
 router.get('/prompts', PromptController.getSystemPrompts);
