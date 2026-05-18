@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { prisma } from '../repositories/prisma.client';
 
 export class NotificationsAdminController {
   static async sendNotification(req: Request, res: Response) {

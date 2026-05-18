@@ -1,5 +1,5 @@
 import { BaseAPIClient } from './core';
-import { API_PREFIX_VENDOR } from './config';
+import { API_PREFIX_VENDOR, API_PREFIX_ADMIN } from './config';
 import { CreateModelRequestData, ModelCreationRequest, ModelProfile } from './types';
 
 export const createModelsApi = (client: BaseAPIClient) => ({
@@ -44,25 +44,26 @@ export const createModelsApi = (client: BaseAPIClient) => ({
   },
 
   // =====================
-  // Rutas de Admin (backend Python - aun no migrado)
+  // Rutas de Admin (admin-service Node.js)
   // =====================
   async getPendingModelRequests(): Promise<ModelCreationRequest[]> {
-    return client.request<ModelCreationRequest[]>('/models/pending-requests');
+    return client.request<ModelCreationRequest[]>('/model-requests', {}, API_PREFIX_ADMIN);
   },
 
   async approveModelRequest(requestId: string): Promise<{ message: string; user_id?: string }> {
-    return client.request(`/models/requests/${requestId}/approve`, { method: 'POST' });
+    return client.request(`/model-requests/${requestId}/approve`, { method: 'POST' }, API_PREFIX_ADMIN);
   },
 
   async rejectModelRequest(requestId: string, reason: string): Promise<{ message: string }> {
     return client.request(
-      `/models/requests/${requestId}/reject?reason=${encodeURIComponent(reason)}`, 
-      { method: 'POST' }
+      `/model-requests/${requestId}/reject`, 
+      { method: 'POST', body: JSON.stringify({ reason }) },
+      API_PREFIX_ADMIN
     );
   },
 
   async confirmModelPayment(requestId: string): Promise<{ message: string }> {
-    return client.request(`/models/requests/${requestId}/confirm-payment`, { method: 'POST' });
+    return client.request(`/model-requests/${requestId}/confirm-payment`, { method: 'POST' }, API_PREFIX_ADMIN);
   },
 
   async getAllModelProfiles(status?: string): Promise<ModelProfile[]> {
