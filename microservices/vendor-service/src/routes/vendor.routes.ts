@@ -25,6 +25,7 @@ router.delete('/users/:userId', UserController.delete);
 router.post('/request-creation', ModelController.requestCreation);
 router.get('/my-requests', ModelController.getMyRequests);
 router.get('/my-models', ModelController.getMyModels);
+router.get('/my-models-and-requests', ModelController.getMyModelsAndRequests);
 router.get('/my-models-select', ModelController.getModelsForSelect);
 router.post('/profiles/:profileId/toggle-status', ModelController.toggleStatus);
 

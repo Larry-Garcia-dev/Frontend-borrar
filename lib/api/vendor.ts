@@ -1,6 +1,6 @@
 import { BaseAPIClient } from './core';
 import { API_PREFIX_VENDOR, API_VENDOR_BASE_URL } from './config';
-import { VendorUser } from './types';
+import { VendorUser, ModelProfile, ModelCreationRequest } from './types';
 
 export const createVendorApi = (client: BaseAPIClient) => ({
   // =====================
@@ -23,10 +23,17 @@ export const createVendorApi = (client: BaseAPIClient) => ({
   },
 
   // =====================
-  // Modelos para Selector
+  // Modelos para Selector (solo activos)
   // =====================
-  async getModelsForSelect(): Promise<any[]> {
-    return client.request<any[]>('/my-models-select', {}, API_PREFIX_VENDOR);
+  async getModelsForSelect(): Promise<{ id: string; user_id: string; display_name: string }[]> {
+    return client.request('/my-models-select', {}, API_PREFIX_VENDOR);
+  },
+
+  // =====================
+  // Modelos y Solicitudes combinados
+  // =====================
+  async getMyModelsAndRequests(): Promise<{ requests: ModelCreationRequest[]; profiles: ModelProfile[] }> {
+    return client.request('/my-models-and-requests', {}, API_PREFIX_VENDOR);
   },
 
   // =====================

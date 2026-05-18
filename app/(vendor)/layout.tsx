@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   ChevronLeft,
   Store,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { useAuthStore } from "@/lib/store/auth-store";
 
 const sidebarLinks = [
   { href: "/vendor", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/vendor/models", label: "Mis Modelos", icon: UserPlus },
   { href: "/vendor/users", label: "Mis Usuarios", icon: Users },
 ];
 

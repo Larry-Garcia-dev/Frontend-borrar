@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, UserPlus, Check, X, DollarSign, Image as ImageIcon, ZoomIn } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageModal } from "@/components/ui/image-modal";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useAdminStore } from "@/lib/store/admin-store";
 import { resolveVendorMediaUrl } from "@/lib/api/config";
 import { formatDate, cn } from "@/lib/utils";
 
 export default function AdminReportsPage() {
+  const confirm = useConfirm();
   const { 
     reports, 
     modelRequests, 
@@ -45,33 +48,82 @@ export default function AdminReportsPage() {
   }, [fetchReports, fetchModelRequests]);
 
   const handleApproveModel = async (id: string) => {
-    if(confirm("¿Estás seguro de aprobar la creación de esta modelo?")) {
-      await approveModelRequest(id);
+    const confirmed = await confirm({
+      title: "Aprobar creacion de modelo",
+      message: "Se creara el usuario y perfil de la modelo. Esta accion no se puede deshacer.",
+      confirmText: "Aprobar",
+      variant: "success",
+    });
+    if (confirmed) {
+      const success = await approveModelRequest(id);
+      if (success) {
+        toast.success("Modelo aprobada correctamente");
+      } else {
+        toast.error("Error al aprobar la modelo");
+      }
     }
   };
 
   const handleConfirmPayment = async (id: string) => {
-    if(confirm("¿Confirmas que has recibido el pago por la creación de este perfil?")) {
-      await confirmModelPayment(id);
+    const confirmed = await confirm({
+      title: "Confirmar pago recibido",
+      message: "Confirmas que has recibido el pago por la creacion de este perfil?",
+      confirmText: "Confirmar Pago",
+      variant: "warning",
+    });
+    if (confirmed) {
+      const success = await confirmModelPayment(id);
+      if (success) {
+        toast.success("Pago confirmado. Solicitud lista para aprobar.");
+      } else {
+        toast.error("Error al confirmar el pago");
+      }
     }
   };
 
   const handleRejectModel = async () => {
     if (!rejectingId || !rejectReason.trim()) return;
-    await rejectModelRequest(rejectingId, rejectReason);
+    const success = await rejectModelRequest(rejectingId, rejectReason);
+    if (success) {
+      toast.success("Solicitud rechazada");
+    } else {
+      toast.error("Error al rechazar la solicitud");
+    }
     setRejectingId(null);
     setRejectReason("");
   };
 
   const handleApproveReport = async (id: string) => {
-    if(confirm("¿Aprobar reporte y reembolsar crédito al usuario?")) {
-      await approveReport(id);
+    const confirmed = await confirm({
+      title: "Aprobar reporte",
+      message: "Se reembolsara el credito al usuario y se eliminara la imagen.",
+      confirmText: "Aprobar y Reembolsar",
+      variant: "success",
+    });
+    if (confirmed) {
+      const success = await approveReport(id);
+      if (success) {
+        toast.success("Reporte aprobado. Credito reembolsado.");
+      } else {
+        toast.error("Error al aprobar el reporte");
+      }
     }
   };
 
   const handleRejectReport = async (id: string) => {
-    if(confirm("¿Rechazar este reporte? (No se reembolsará crédito)")) {
-      await rejectReport(id, "Reporte rechazado por el administrador.");
+    const confirmed = await confirm({
+      title: "Rechazar reporte",
+      message: "El usuario no recibira reembolso. La imagen se mantendra.",
+      confirmText: "Rechazar",
+      variant: "danger",
+    });
+    if (confirmed) {
+      const success = await rejectReport(id, "Reporte rechazado por el administrador.");
+      if (success) {
+        toast.info("Reporte rechazado");
+      } else {
+        toast.error("Error al rechazar el reporte");
+      }
     }
   };
 
