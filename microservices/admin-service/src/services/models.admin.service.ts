@@ -55,6 +55,9 @@ export class ModelsAdminService {
     ]);
 
     // 3. Crear el Perfil (ModelProfile)
+    const modelInfo = request.model_info as any || {};
+    const ageValue = modelInfo.age ? parseInt(String(modelInfo.age), 10) : null;
+    
     await prisma.modelProfile.create({
       data: {
         user_id: modelUser.id,
@@ -65,8 +68,8 @@ export class ModelsAdminService {
         explicit_training_photos: request.explicit_training_photos || [],
         images_per_order: Number(assignedLimit),
         status: 'APPROVED',
-        age: (request.model_info as any)?.age,
-        gender: (request.model_info as any)?.gender,
+        age: isNaN(ageValue as number) ? null : ageValue,
+        gender: modelInfo.gender || null,
       }
     });
 
