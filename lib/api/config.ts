@@ -14,6 +14,13 @@ export function resolveMediaUrl(url: string): string {
   return url;
 }
 
+export function resolveVendorMediaUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/")) return `${API_VENDOR_BASE_URL}${url}`;
+  return `${API_VENDOR_BASE_URL}/${url}`;
+}
+
 export function getTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|; )mf_access_token=([^;]*)/);
