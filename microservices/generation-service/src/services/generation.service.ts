@@ -6,9 +6,9 @@ import { env } from '../config/env';
 import { GenerationRequest, GenerationResult } from '../types';
 import { alibabaClient } from './alibaba/client';
 import { extractImageUrls, pollAlibabaTask, guessExtension, shuffleArray } from '../utils/alibaba.util';
-import { 
-  getGenerationPath, 
-  ensureDirectoryExists, 
+import {
+  getGenerationPath,
+  ensureDirectoryExists,
   urlToBase64DataUri,
 } from '../utils/storage.util';
 
@@ -32,7 +32,7 @@ const VARIATIONS = [
 
 export class GenerationService {
   static async generateForModel(
-    studioId: string, 
+    studioId: string,
     data: GenerationRequest
   ): Promise<GenerationResult> {
     console.log('[generation-service] ========== STARTING GENERATION ==========');
@@ -81,8 +81,8 @@ export class GenerationService {
     // 3. Seleccionar fotos de entrenamiento al azar
     console.log('[generation-service] Step 3: Selecting training photos...');
     const isExplicit = data.is_explicit && profile.is_explicit;
-    const trainingPhotos = isExplicit 
-      ? (profile.explicit_training_photos as string[]) 
+    const trainingPhotos = isExplicit
+      ? (profile.explicit_training_photos as string[])
       : (profile.training_photos as string[]);
 
     console.log('[generation-service] Using explicit photos:', isExplicit);
@@ -138,8 +138,8 @@ export class GenerationService {
       console.log(`[generation-service] --- Image ${i + 1}/${actualNum} ---`);
       try {
         // Agregar variacion al prompt
-        const variationPrompt = i < VARIATIONS.length 
-          ? `${data.prompt}${VARIATIONS[i]}` 
+        const variationPrompt = i < VARIATIONS.length
+          ? `${data.prompt}${VARIATIONS[i]}`
           : data.prompt;
         console.log('[generation-service] Variation prompt:', variationPrompt.substring(0, 80) + '...');
 
@@ -198,7 +198,11 @@ export class GenerationService {
         const fullPath = path.join(outputPath, fileName);
         fs.writeFileSync(fullPath, imageBytes);
 
-        const storageUrl = fullPath.replace(env.STORAGE_PATH, '/generadas');
+        // Reemplaza la ruta base y luego convierte todas las contratabarras (\) en barras normales (/)
+        // EXTRAEMOS LA RUTA RELATIVA Y FORZAMOS BARRAS DIAGONALES NORMALES
+        const relativePath = path.relative(env.STORAGE_PATH, fullPath);
+        const storageUrl = `/generadas/${relativePath.replace(/\\/g, '/')}`;
+        console.log('[DEBUG] RUTA EXACTA GUARDADA EN DB:', storageUrl); // <- Esto nos dirá la verdad
         storageUrls.push(storageUrl);
 
         console.log(`[generation-service] Image ${i + 1}/${actualNum} SAVED: ${fileName}`);
@@ -225,8 +229,8 @@ export class GenerationService {
           prompt: data.prompt,
           original_prompt: data.prompt,
           media_type: 'PHOTO',
-          edit_count: 0,
-          is_approved: false,
+          edit_count: 0,       // Usar guión bajo
+          is_approved: false,  // Usar guión bajo
           created_at: new Date(),
         },
       });

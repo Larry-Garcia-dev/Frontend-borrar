@@ -1,10 +1,10 @@
 import { StateCreator } from "zustand";
 import { GenerationStore, ExecutionSlice } from "./types";
 import { api, GenerationRequest, resolveMediaUrl, GeneratedMedia } from "@/lib/api-client";
-import { resolveVendorMediaUrl } from "@/lib/api/config";
+
 
 export const createExecutionSlice: StateCreator<GenerationStore, [], [], ExecutionSlice> = (set, get) => ({
-  currentGeneration: null,
+    currentGeneration: null,
   currentGenerations: [],
   isGenerating: false,
   isLoading: false,
@@ -51,14 +51,23 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
       return null; 
     }
     
+    // 1. Iniciamos el loader con un progreso base
     set({ 
       isGenerating: true, 
       error: null, 
-      progress: 0, 
-      taskStatus: "queued",
+      progress: 5, 
+      taskStatus: "started",
       currentGeneration: null,
       currentGenerations: [],
     });
+
+    // 2. Simulamos progreso visual (ya que el backend bloqueará la petición HTTP hasta terminar)
+    const progressInterval = setInterval(() => {
+      set((s) => ({ 
+        // Aumenta poco a poco hasta estancarse en el 90% esperando el backend
+        progress: s.progress < 90 ? s.progress + 5 : 90 
+      }));
+    }, 2500);
     
     try {
       const result = await api.triggerGenerationFromStudio({
@@ -70,11 +79,13 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
         height: state.height,
       });
       
+      clearInterval(progressInterval); // Limpiamos la simulación al recibir respuesta
+      
       // Transformar la respuesta del backend a GeneratedMedia[]
-      // El backend devuelve: { id, storage_urls: string[], prompt, created_at, count }
       const generatedImages: GeneratedMedia[] = (result.storage_urls || []).map((url: string, index: number) => ({
         id: index === 0 ? result.id : `${result.id}-${index}`,
-        storage_url: resolveVendorMediaUrl(url),
+        // CORRECCIÓN CLAVE: Usar resolveMediaUrl para apuntar al Generation Service
+        storage_url: resolveMediaUrl(url), 
         prompt: result.prompt || state.prompt,
         original_prompt: result.prompt || state.prompt,
         media_type: 'image',
@@ -98,6 +109,7 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
       set({ isGenerating: false, progress: 0, taskStatus: "" }); 
       return null;
     } catch (e: any) { 
+      clearInterval(progressInterval);
       set({ error: e.message, isGenerating: false, progress: 0, taskStatus: "failure" }); 
       return null; 
     }
