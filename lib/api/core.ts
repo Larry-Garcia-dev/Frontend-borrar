@@ -1,11 +1,11 @@
 import { 
   API_BASE_URL, 
   API_AUTH_BASE_URL, 
-  API_VENDOR_BASE_URL, // <--- AÑADIDO AQUÍ
-  API_ADMIN_BASE_URL, 
+  API_ADMIN_BASE_URL,
+  API_VENDOR_BASE_URL,
   API_PREFIX, 
   API_PREFIX_ADMIN, 
-  API_PREFIX_VENDOR,   // <--- AÑADIDO AQUÍ
+  API_PREFIX_VENDOR,
   getTokenFromCookie, 
   setTokenCookie 
 } from './config';
@@ -23,15 +23,12 @@ export class BaseAPIClient {
     }
   }
 
-  getToken(): string | null {
-    return this.token;
-  }
+  getToken(): string | null { return this.token; }
 
   setToken(token: string | null) {
     this.token = token;
     if (typeof window !== "undefined") {
       setTokenCookie(token);
-      if (token) localStorage.removeItem("auth_token");
     }
   }
 
@@ -49,15 +46,14 @@ export class BaseAPIClient {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
-    // ENRUTADOR INTELIGENTE DE MICROSERVICIOS
-    let baseUrl = API_BASE_URL; // Por defecto (Puerto 8000 - Python)
+    let baseUrl = API_BASE_URL;
     
     if (endpoint.includes("/auth")) {
-      baseUrl = API_AUTH_BASE_URL; // Puerto 4000 (Auth Node.js)
+      baseUrl = API_AUTH_BASE_URL;
     } else if (usePrefix === API_PREFIX_ADMIN) {
-      baseUrl = API_ADMIN_BASE_URL; // Puerto 4001 (Admin Node.js)
+      baseUrl = API_ADMIN_BASE_URL;
     } else if (usePrefix === API_PREFIX_VENDOR) {
-      baseUrl = API_VENDOR_BASE_URL; // NUEVO: Puerto 4002 (Vendor Node.js)
+      baseUrl = API_VENDOR_BASE_URL;
     }
 
     const response = await fetch(`${baseUrl}${usePrefix}${endpoint}`, {
@@ -71,10 +67,7 @@ export class BaseAPIClient {
       throw new Error(error.detail || `Error: ${response.status}`);
     }
 
-    if (response.status === 204) {
-      return {} as T;
-    }
-
+    if (response.status === 204) return {} as T;
     return response.json();
   }
 }

@@ -16,8 +16,6 @@ export interface FormSlice {
   parentEditCount: number;
   selectedSize: string;
   isExplicitMode: boolean;
-  
-  // Studio All-In-One Config
   studioModels: any[];
   selectedStudioModelId: string | null;
 
@@ -37,8 +35,6 @@ export interface FormSlice {
   startEdit: (mediaId: string, editCount: number) => void;
   cancelEdit: () => void;
   resetForm: () => void;
-  
-  // Studio Actions
   setSelectedStudioModelId: (id: string | null) => void;
   fetchStudioModels: () => Promise<void>;
 }
@@ -46,7 +42,6 @@ export interface FormSlice {
 export interface MediaSlice {
   generations: GeneratedMedia[];
   promptTemplates: PromptTemplate[];
-  
   fetchGenerations: () => Promise<void>;
   fetchPromptTemplates: () => Promise<void>;
   approveMedia: (mediaId: string) => Promise<void>;
@@ -63,7 +58,6 @@ export interface ExecutionSlice {
   progress: number;
   taskStatus: string;
   taskId: string | null;
-
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
   generateEdit: (mediaId: string, hiddenPrompt: string, negativePrompt: string, clothingText: string, customPrompt: string, width: number, height: number, numImages: number) => Promise<GeneratedMedia[] | null>;

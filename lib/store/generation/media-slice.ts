@@ -23,7 +23,7 @@ export const createMediaSlice: StateCreator<GenerationStore, [], [], MediaSlice>
     try {
       const templates = await api.getPromptTemplates();
       set({ promptTemplates: templates });
-    } catch { /* Silent fail */ }
+    } catch { /* Fail */ }
   },
 
   approveMedia: async (mediaId) => {
@@ -34,7 +34,7 @@ export const createMediaSlice: StateCreator<GenerationStore, [], [], MediaSlice>
         currentGeneration: state.currentGeneration?.id === mediaId 
           ? { ...state.currentGeneration, is_approved: true } : state.currentGeneration
       }));
-    } catch (error) { console.error("Error al aprobar:", error); }
+    } catch (error) { console.error(error); }
   },
 
   reportMedia: async (mediaId, reason) => {
