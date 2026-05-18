@@ -1,6 +1,6 @@
 import { BaseAPIClient } from './core';
 import { API_PREFIX_ADMIN } from './config';
-import { AdminStats, AdminUser, UserCost, UserMedia, ImageReport, PromptTemplate, SystemPrompt } from './types';
+import { AdminStats, AdminUser, UserCost, UserMedia, ImageReport, PromptTemplate, SystemPrompt, ModelCreationRequest } from './types';
 
 export const createAdminApi = (client: BaseAPIClient) => ({
   async getAdminStats(): Promise<AdminStats> {
@@ -35,6 +35,22 @@ export const createAdminApi = (client: BaseAPIClient) => ({
   },
   async rejectReport(reportId: string, adminNote?: string): Promise<{ detail: string }> {
     return client.request<{ detail: string }>(`/reports/${reportId}/reject`, { method: "POST", body: JSON.stringify({ admin_note: adminNote }) }, API_PREFIX_ADMIN);
+  },
+
+  // ============================================
+  // Solicitudes de Creacion de Modelos
+  // ============================================
+  async getPendingModelRequests(): Promise<ModelCreationRequest[]> {
+    return client.request<ModelCreationRequest[]>("/model-requests", {}, API_PREFIX_ADMIN);
+  },
+  async approveModelRequest(requestId: string): Promise<{ message: string; status: string }> {
+    return client.request<{ message: string; status: string }>(`/model-requests/${requestId}/approve`, { method: "POST" }, API_PREFIX_ADMIN);
+  },
+  async rejectModelRequest(requestId: string, reason: string): Promise<{ message: string; status: string }> {
+    return client.request<{ message: string; status: string }>(`/model-requests/${requestId}/reject`, { method: "POST", body: JSON.stringify({ reason }) }, API_PREFIX_ADMIN);
+  },
+  async confirmModelPayment(requestId: string): Promise<{ message: string; status: string }> {
+    return client.request<{ message: string; status: string }>(`/model-requests/${requestId}/confirm-payment`, { method: "POST" }, API_PREFIX_ADMIN);
   },
   
   // ============================================

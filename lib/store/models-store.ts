@@ -54,13 +54,27 @@ export const useModelsStore = create<ModelsState>((set) => ({
   fetchModelsAndRequests: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { requests, profiles } = await api.getMyModelsAndRequests();
-      set({ requests, models: profiles, isLoading: false });
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : "Error al cargar datos",
-        isLoading: false,
+      const result = await api.getMyModelsAndRequests();
+      set({ 
+        requests: result?.requests || [], 
+        models: result?.profiles || [], 
+        isLoading: false 
       });
+    } catch (error) {
+      console.error("[v0] Error loading models and requests:", error);
+      // Si falla el endpoint combinado, intentar los individuales
+      try {
+        const [requests, models] = await Promise.all([
+          api.getMyModelRequests().catch(() => []),
+          api.getMyModels().catch(() => []),
+        ]);
+        set({ requests, models, isLoading: false });
+      } catch {
+        set({
+          error: error instanceof Error ? error.message : "Error al cargar datos",
+          isLoading: false,
+        });
+      }
     }
   },
 
