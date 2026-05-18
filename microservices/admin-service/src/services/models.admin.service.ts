@@ -15,21 +15,20 @@ export class ModelsAdminService {
       throw new Error("Esta solicitud ya fue procesada");
     }
 
-    // Lógica de validación de pago
+    // Logica de validacion de pago
     if (request.payment_required && !request.payment_completed) {
-      await prisma.modelCreationRequest.update({
+      const updated = await prisma.modelCreationRequest.update({
         where: { id: requestId },
         data: { status: 'PAYMENT_PENDING' }
       });
-      // TODO: Disparar notificación al estudio sobre pago pendiente
-      return { message: "Solicitud aprobada. Pendiente de pago.", status: "PAYMENT_PENDING" };
+      return { message: "Solicitud aprobada. Pendiente de pago.", status: updated.status, request: updated };
     }
 
     // 1. Crear el Usuario (Modelo)
     const assignedLimit = (request.model_info as any)?.assigned_daily_limit || 10;
     
-    // Usamos transacción para garantizar que se creen ambos registros
-    const [modelUser, _] = await prisma.$transaction([
+    // Usamos transaccion para garantizar que se creen ambos registros
+    const [modelUser, updatedRequest] = await prisma.$transaction([
       prisma.user.create({
         data: {
           email: request.model_email,
@@ -71,14 +70,13 @@ export class ModelsAdminService {
       }
     });
 
-    // TODO: Disparar notificación de aprobación al Estudio
-    return { message: "Modelo creada exitosamente", user_id: modelUser.id };
+    return { message: "Modelo creada exitosamente", user_id: modelUser.id, status: "COMPLETED" };
   }
 
   static async rejectRequest(requestId: string, adminId: string, reason: string) {
-    if (!reason || reason.length < 10) throw new Error("Debe proporcionar una razón detallada");
+    if (!reason || reason.length < 10) throw new Error("Debe proporcionar una razon detallada");
     
-    return prisma.modelCreationRequest.update({
+    const updated = await prisma.modelCreationRequest.update({
       where: { id: requestId },
       data: {
         status: 'REJECTED',
@@ -87,10 +85,11 @@ export class ModelsAdminService {
         reviewed_at: new Date()
       }
     });
+    return { message: "Solicitud rechazada", status: updated.status };
   }
 
   static async confirmPayment(requestId: string) {
-    return prisma.modelCreationRequest.update({
+    const updated = await prisma.modelCreationRequest.update({
       where: { id: requestId },
       data: {
         payment_completed: true,
@@ -98,5 +97,6 @@ export class ModelsAdminService {
         status: 'PENDING' // Vuelve a PENDING para que el admin genere el perfil
       }
     });
+    return { message: "Pago confirmado", status: updated.status };
   }
 }

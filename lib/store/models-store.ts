@@ -11,6 +11,7 @@ interface ModelsState {
   // Actions
   fetchModels: () => Promise<void>;
   fetchRequests: () => Promise<void>;
+  fetchModelsAndRequests: () => Promise<void>;
   fetchModelsForSelect: () => Promise<void>;
   toggleStatus: (profileId: string) => Promise<boolean>;
   clearError: () => void;
@@ -49,12 +50,26 @@ export const useModelsStore = create<ModelsState>((set) => ({
     }
   },
 
+  // Nuevo: obtener modelos y solicitudes combinados
+  fetchModelsAndRequests: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { requests, profiles } = await api.getMyModelsAndRequests();
+      set({ requests, models: profiles, isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al cargar datos",
+        isLoading: false,
+      });
+    }
+  },
+
   fetchModelsForSelect: async () => {
     try {
       const modelsForSelect = await api.getModelsForSelect();
       set({ modelsForSelect });
     } catch (error) {
-      console.error("[v0] Error fetching models for select:", error);
+      console.error("Error fetching models for select:", error);
     }
   },
 

@@ -21,6 +21,10 @@ export const createModelsApi = (client: BaseAPIClient) => ({
     return client.request<ModelProfile[]>('/my-models', {}, API_PREFIX_VENDOR);
   },
 
+  async getMyModelsAndRequests(): Promise<{ requests: ModelCreationRequest[]; profiles: ModelProfile[] }> {
+    return client.request('/my-models-and-requests', {}, API_PREFIX_VENDOR);
+  },
+
   async toggleModelStatus(profileId: string): Promise<ModelProfile> {
     return client.request<ModelProfile>(
       `/profiles/${profileId}/toggle-status`, 
