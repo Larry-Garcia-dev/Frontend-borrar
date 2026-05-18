@@ -11,6 +11,11 @@ export const API_PREFIX_VENDOR = "/api/vendor";
 export function resolveMediaUrl(url: string): string {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  
+  // NUEVA REGLA: Si la imagen es generada, va directo al microservicio de generación (Puerto 3003)
+  if (url.startsWith("/generadas")) return `${API_GENERATION_BASE_URL}${url}`;
+  
+  // Para el resto de cosas, usa la base normal
   if (url.startsWith("/")) return `${API_BASE_URL}${url}`;
   return url;
 }
