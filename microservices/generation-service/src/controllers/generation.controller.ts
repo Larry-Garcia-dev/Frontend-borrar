@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { GenerationService } from '../services/generation.service';
 import { GenerationRequest } from '../types';
+import { prisma } from '../config/prisma'; // Faltaba importar prisma
 
 export class GenerationController {
   static async generateForModel(req: AuthRequest, res: Response): Promise<void> {
@@ -52,6 +53,28 @@ export class GenerationController {
     } catch (e: any) {
       console.error('[generation-controller] ERROR getting generations:', e.message);
       res.status(e.status || 500).json({ detail: e.message });
+    }
+  }
+
+  // NUEVA FUNCIÓN AGREGADA PARA APROBAR LA IMAGEN
+  static async approveMedia(req: AuthRequest, res: Response): Promise<void> {
+    console.log('[generation-controller] Approving media:', req.params.mediaId);
+    try {
+      const { mediaId } = req.params;
+      
+      // Actualizamos la imagen en BD para marcarla como aprobada
+      await prisma.media.update({
+        where: { id: mediaId },
+        data: { 
+          isApproved: true,
+          approvedAt: new Date()
+        }
+      });
+
+      res.json({ detail: "Imagen aprobada exitosamente" });
+    } catch (e: any) {
+      console.error('[generation-controller] ERROR approving media:', e.message);
+      res.status(500).json({ detail: "Error al aprobar la imagen" });
     }
   }
 }

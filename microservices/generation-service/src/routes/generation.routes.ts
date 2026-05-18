@@ -12,4 +12,7 @@ router.post('/generate', GenerationController.generateForModel);
 // Obtener generaciones de una modelo
 router.get('/models/:modelUserId/generations', GenerationController.getModelGenerations);
 
+
+router.post('/:mediaId/approve', GenerationController.approveMedia);
+// NUEVA RUTA: Aprobar imagen
 export default router;

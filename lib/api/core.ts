@@ -3,6 +3,7 @@ import {
   API_AUTH_BASE_URL, 
   API_ADMIN_BASE_URL,
   API_VENDOR_BASE_URL,
+  API_GENERATION_BASE_URL, // IMPORTADO
   API_PREFIX, 
   API_PREFIX_ADMIN, 
   API_PREFIX_VENDOR,
@@ -47,6 +48,7 @@ export class BaseAPIClient {
     }
 
     let baseUrl = API_BASE_URL;
+    let finalPrefix = usePrefix; // <-- ESTO FALTABA
     
     if (endpoint.includes("/auth")) {
       baseUrl = API_AUTH_BASE_URL;
@@ -54,9 +56,14 @@ export class BaseAPIClient {
       baseUrl = API_ADMIN_BASE_URL;
     } else if (usePrefix === API_PREFIX_VENDOR) {
       baseUrl = API_VENDOR_BASE_URL;
+    } else if (endpoint.startsWith("/generation")) {
+      // <-- ESTA REGLA FALTABA PARA QUE FUNCIONE EL "APROBAR"
+      baseUrl = API_GENERATION_BASE_URL;
+      finalPrefix = "/api"; 
     }
 
-    const fullUrl = `${baseUrl}${usePrefix}${endpoint}`;
+    // Usar finalPrefix en lugar de usePrefix
+    const fullUrl = `${baseUrl}${finalPrefix}${endpoint}`;
 
     try {
       const response = await fetch(fullUrl, {
