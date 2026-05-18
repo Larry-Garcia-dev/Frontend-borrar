@@ -1,4 +1,7 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_AUTH_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:4000";
+export const API_ADMIN_BASE_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || "http://localhost:4001"; // NUEVO: Puerto del Admin Service
+
 export const API_PREFIX = "/api/v1";
 export const API_PREFIX_ADMIN = "/api/admin";
 export const API_PREFIX_VENDOR = "/api/vendor";

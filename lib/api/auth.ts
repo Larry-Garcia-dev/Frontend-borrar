@@ -1,5 +1,5 @@
 import { BaseAPIClient } from './core';
-import { API_BASE_URL, API_PREFIX } from './config';
+import { API_AUTH_BASE_URL, API_PREFIX } from './config';
 import { LoginCredentials, RegisterData, AuthResponse, GoogleCallbackResponse, MeResponse } from './types';
 
 export const createAuthApi = (client: BaseAPIClient) => ({
@@ -24,7 +24,8 @@ export const createAuthApi = (client: BaseAPIClient) => ({
     return response;
   },
   loginWithGoogle(): void {
-    window.location.href = `${API_BASE_URL}${API_PREFIX}/auth/google`;
+    // MODIFICADO: Apunta directamente al endpoint de Google del microservicio en Node.js
+    window.location.href = `${API_AUTH_BASE_URL}${API_PREFIX}/auth/google`;
   },
   async handleGoogleCallback(code: string): Promise<GoogleCallbackResponse> {
     const response = await client.request<GoogleCallbackResponse>(

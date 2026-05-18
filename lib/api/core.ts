@@ -1,4 +1,12 @@
-import { API_BASE_URL, API_PREFIX, getTokenFromCookie, setTokenCookie } from './config';
+import { 
+  API_BASE_URL, 
+  API_AUTH_BASE_URL, 
+  API_ADMIN_BASE_URL, 
+  API_PREFIX, 
+  API_PREFIX_ADMIN, 
+  getTokenFromCookie, 
+  setTokenCookie 
+} from './config';
 
 export class BaseAPIClient {
   protected token: string | null = null;
@@ -39,7 +47,16 @@ export class BaseAPIClient {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${usePrefix}${endpoint}`, {
+    // ENRUTADOR INTELIGENTE DE MICROSERVICIOS
+    let baseUrl = API_BASE_URL; // Por defecto (Puerto 8000 - Python)
+    
+    if (endpoint.includes("/auth")) {
+      baseUrl = API_AUTH_BASE_URL; // Puerto 4000 (Auth Node.js)
+    } else if (usePrefix === API_PREFIX_ADMIN) {
+      baseUrl = API_ADMIN_BASE_URL; // Puerto 4001 (Admin Node.js)
+    }
+
+    const response = await fetch(`${baseUrl}${usePrefix}${endpoint}`, {
       ...options,
       headers,
       credentials: "include",
