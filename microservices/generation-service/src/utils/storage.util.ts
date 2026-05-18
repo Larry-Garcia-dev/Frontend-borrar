@@ -55,6 +55,10 @@ export async function urlToBase64DataUri(url: string): Promise<string> {
 
   console.log('[storage-util] urlToBase64DataUri called with:', url);
   console.log('[storage-util] TRAINING_PHOTOS_PATH:', env.TRAINING_PHOTOS_PATH);
+  
+  // Resolver TRAINING_PHOTOS_PATH a ruta absoluta
+  const trainingBasePath = path.resolve(process.cwd(), env.TRAINING_PHOTOS_PATH);
+  console.log('[storage-util] Resolved training base path:', trainingBasePath);
 
   // Si es URL local (archivo en el servidor)
   if (url.startsWith('/') || url.startsWith('./') || url.startsWith(env.TRAINING_PHOTOS_PATH)) {
@@ -65,17 +69,17 @@ export async function urlToBase64DataUri(url: string): Promise<string> {
     if (url.startsWith('/models/training/')) {
       // Extraer la parte despues de /models/training/
       const relativePart = url.replace('/models/training/', '');
-      localPath = path.join(env.TRAINING_PHOTOS_PATH, relativePart);
+      localPath = path.join(trainingBasePath, relativePart);
     } else if (url.startsWith('/media/')) {
-      localPath = path.join(env.TRAINING_PHOTOS_PATH, url.replace('/media/', ''));
+      localPath = path.join(trainingBasePath, url.replace('/media/', ''));
     } else if (url.startsWith('./')) {
-      localPath = url;
+      localPath = path.resolve(process.cwd(), url);
     } else if (url.startsWith('/')) {
       // Otras rutas absolutas
       const relativePart = url.substring(1); // quitar el /
-      localPath = path.join(env.TRAINING_PHOTOS_PATH, relativePart);
+      localPath = path.join(trainingBasePath, relativePart);
     } else {
-      localPath = url;
+      localPath = path.resolve(process.cwd(), url);
     }
     
     // Normalizar la ruta para el sistema operativo
@@ -85,16 +89,7 @@ export async function urlToBase64DataUri(url: string): Promise<string> {
     console.log('[storage-util] File exists:', fs.existsSync(localPath));
     
     if (!fs.existsSync(localPath)) {
-      // Intentar ruta alternativa - buscar en el directorio actual
-      const altPath = path.join(process.cwd(), url.startsWith('/') ? url.substring(1) : url);
-      console.log('[storage-util] Trying alternative path:', altPath);
-      
-      if (fs.existsSync(altPath)) {
-        localPath = altPath;
-        console.log('[storage-util] Found at alternative path');
-      } else {
-        throw new Error(`Archivo no encontrado: ${localPath} (tambien intentado: ${altPath})`);
-      }
+      throw new Error(`Archivo no encontrado: ${localPath}`);
     }
     imageBuffer = fs.readFileSync(localPath);
     console.log('[storage-util] File read successfully, size:', imageBuffer.length);
