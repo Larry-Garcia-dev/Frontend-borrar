@@ -43,10 +43,24 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
   },
 
   generateForModel: async (modelUserId: string) => {
+    console.log("[v0] execution-slice: generateForModel called");
+    console.log("[v0] execution-slice: modelUserId:", modelUserId);
+    
     const state = get();
-    if (!state.prompt.trim()) { set({ error: "Ingresa un prompt" }); return null; }
+    console.log("[v0] execution-slice: prompt:", state.prompt);
+    console.log("[v0] execution-slice: numImages:", state.numImages);
+    console.log("[v0] execution-slice: isExplicitMode:", state.isExplicitMode);
+    
+    if (!state.prompt.trim()) { 
+      console.log("[v0] execution-slice: ERROR - No prompt");
+      set({ error: "Ingresa un prompt" }); 
+      return null; 
+    }
+    
     set({ isGenerating: true, error: null, progress: 0, taskStatus: "queued" });
+    
     try {
+      console.log("[v0] execution-slice: Calling api.triggerGenerationFromStudio...");
       const result = await api.triggerGenerationFromStudio({
         model_user_id: modelUserId,
         prompt: state.prompt,
@@ -55,9 +69,12 @@ export const createExecutionSlice: StateCreator<GenerationStore, [], [], Executi
         width: state.width,
         height: state.height,
       });
+      console.log("[v0] execution-slice: API result:", result);
       set({ isGenerating: false, progress: 100, taskStatus: "success" });
       return result;
     } catch (e: any) { 
+      console.error("[v0] execution-slice: ERROR:", e);
+      console.error("[v0] execution-slice: Error message:", e.message);
       set({ error: e.message, isGenerating: false, progress: 0, taskStatus: "failure" }); 
       return null; 
     }

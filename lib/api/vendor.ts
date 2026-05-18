@@ -47,10 +47,22 @@ export const createVendorApi = (client: BaseAPIClient) => ({
     width?: number;
     height?: number;
   }): Promise<any> {
-    return client.request<any>('/generate-for-model', { 
-      method: 'POST', 
-      body: JSON.stringify(data),
-    }, API_PREFIX_VENDOR);
+    console.log("[v0] triggerGenerationFromStudio called");
+    console.log("[v0] API_VENDOR_BASE_URL:", API_VENDOR_BASE_URL);
+    console.log("[v0] API_PREFIX_VENDOR:", API_PREFIX_VENDOR);
+    console.log("[v0] Data:", JSON.stringify(data));
+    
+    try {
+      const result = await client.request<any>('/generate-for-model', { 
+        method: 'POST', 
+        body: JSON.stringify(data),
+      }, API_PREFIX_VENDOR);
+      console.log("[v0] API response:", result);
+      return result;
+    } catch (error: any) {
+      console.error("[v0] API error:", error);
+      throw error;
+    }
   },
 
   // =====================

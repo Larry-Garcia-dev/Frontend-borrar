@@ -100,14 +100,23 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   };
 
   const handleGenerate = async () => {
+    console.log("[v0] handleGenerate called");
+    console.log("[v0] isStudio:", isStudio);
+    console.log("[v0] selectedModelUserId:", selectedModelUserId);
+    console.log("[v0] prompt:", prompt);
+    
     clearError();
     onGenerateStart();
     
     // Si es estudio y tiene modelo seleccionado, usar generateForModel
     if (isStudio && selectedModelUserId) {
-      await generateForModel(selectedModelUserId);
+      console.log("[v0] Calling generateForModel...");
+      const result = await generateForModel(selectedModelUserId);
+      console.log("[v0] generateForModel result:", result);
     } else {
-      await generate();
+      console.log("[v0] Calling generate...");
+      const result = await generate();
+      console.log("[v0] generate result:", result);
     }
   };
 
