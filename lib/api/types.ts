@@ -134,6 +134,7 @@ export interface AdminUser {
 export interface VendorUser {
   id: string;
   email: string;
+  name?: string;
   role: string;
   daily_limit: number;
   used_quota: number;
