@@ -214,7 +214,6 @@ export class GenerationService {
     }
 
     // 7. Guardar registros en la base de datos
-    // 7. Guardar registros en la base de datos
     console.log('[generation-service] Step 7: Saving to database...');
     const createdMedia = [];
     for (const url of storageUrls) {
@@ -223,10 +222,11 @@ export class GenerationService {
           id: uuidv4(),
           user_id: data.model_user_id,
           storage_url: url,
-          prompt: data.prompt,           // <-- Agregamos el campo prompt faltante
+          prompt: data.prompt,
           original_prompt: data.prompt,
           media_type: 'PHOTO',
-          // status: 'READY',            <-- BORRAMOS esta línea porque "status" no existe en el esquema Media
+          edit_count: 0,
+          is_approved: false,
           created_at: new Date(),
         },
       });
