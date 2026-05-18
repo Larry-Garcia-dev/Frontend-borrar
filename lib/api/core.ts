@@ -56,18 +56,32 @@ export class BaseAPIClient {
       baseUrl = API_VENDOR_BASE_URL;
     }
 
-    const response = await fetch(`${baseUrl}${usePrefix}${endpoint}`, {
-      ...options,
-      headers,
-      credentials: "include",
-    });
+    const fullUrl = `${baseUrl}${usePrefix}${endpoint}`;
+    console.log("[v0] API Request:", options.method || 'GET', fullUrl);
+    console.log("[v0] API Token:", this.token ? "SET" : "NOT SET");
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || `Error: ${response.status}`);
+    try {
+      const response = await fetch(fullUrl, {
+        ...options,
+        headers,
+        credentials: "include",
+      });
+
+      console.log("[v0] API Response status:", response.status);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        console.error("[v0] API Error response:", error);
+        throw new Error(error.detail || `Error: ${response.status}`);
+      }
+
+      if (response.status === 204) return {} as T;
+      const data = await response.json();
+      console.log("[v0] API Success response received");
+      return data;
+    } catch (error: any) {
+      console.error("[v0] API Fetch error:", error.message);
+      throw error;
     }
-
-    if (response.status === 204) return {} as T;
-    return response.json();
   }
 }
