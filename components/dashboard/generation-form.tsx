@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Wand2, Upload, X, Edit3, Flame, Images } from "lucide-react";
+import { Sparkles, Wand2, Upload, X, Edit3, Flame, Images, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { api } from "@/lib/api-client";
@@ -40,13 +47,19 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   
+  // Estado para Studio Admin - seleccion de modelos
+  const [studioModels, setStudioModels] = useState<ModelProfile[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
+  
   const isModelo = user?.role === "MODELO";
+  const isStudioAdmin = user?.isStudioAdmin || user?.role === "ESTUDIO_ADMIN";
   const isModeloOrStudio = user?.role === "MODELO" || user?.role === "ESTUDIO_ADMIN" || user?.isStudioAdmin;
   const isEditing = !!parentMediaId;
   const editsRemaining = Math.max(0, 2 - parentEditCount);
   const editIsFree = parentEditCount < 2;
 
-  // Cargar perfil del modelo para verificar si tiene contenido explícito
+  // Cargar perfil del modelo para verificar si tiene contenido explicito
   useEffect(() => {
     const fetchProfile = async () => {
       if (isModelo) {
@@ -54,8 +67,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
         try {
           const profile = await api.getMyProfile();
           setModelProfile(profile);
-        } catch (err) {
-          console.log("[v0] No model profile found");
+        } catch {
+          // Sin perfil de modelo
         } finally {
           setLoadingProfile(false);
         }
@@ -64,12 +77,59 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     fetchProfile();
   }, [isModelo]);
 
-  // Si es modo explícito y tiene perfil, mostrar el formulario explícito
+  // Cargar modelos del Studio Admin
+  useEffect(() => {
+    const fetchStudioModels = async () => {
+      if (isStudioAdmin) {
+        setLoadingModels(true);
+        try {
+          const models = await api.getMyModels();
+          // Solo mostrar modelos activos que tengan fotos de entrenamiento
+          const activeModels = models.filter(
+            (m) => ["ACTIVE", "APPROVED", "READY"].includes(m.status) && m.training_photos?.length > 0
+          );
+          setStudioModels(activeModels);
+        } catch {
+          // Error cargando modelos
+        } finally {
+          setLoadingModels(false);
+        }
+      }
+    };
+    fetchStudioModels();
+  }, [isStudioAdmin]);
+
+  // Obtener el modelo seleccionado
+  const selectedModel = studioModels.find((m) => m.id === selectedModelId);
+
+  // Manejar seleccion de modelo
+  const handleModelSelect = (modelId: string) => {
+    setSelectedModelId(modelId);
+    // Resetear modo explicito cuando cambia de modelo
+    setIsExplicitMode(false);
+    const model = studioModels.find((m) => m.id === modelId);
+    if (model && model.training_photos?.length > 0) {
+      // Usar las fotos de entrenamiento como referencia
+      setReferenceImageUrls(model.training_photos);
+    }
+  };
+
+  // Si es modo explícito y tiene perfil (modelo), mostrar el formulario explícito
   if (isExplicitMode && modelProfile?.is_explicit && modelProfile) {
     return (
       <ExplicitGenerationForm 
         onGenerateStart={onGenerateStart} 
         modelProfile={modelProfile}
+      />
+    );
+  }
+
+  // Si es Studio Admin en modo explícito con modelo seleccionada, mostrar formulario explícito
+  if (isExplicitMode && isStudioAdmin && selectedModel?.is_explicit && selectedModel) {
+    return (
+      <ExplicitGenerationForm 
+        onGenerateStart={onGenerateStart} 
+        modelProfile={selectedModel}
       />
     );
   }
@@ -146,6 +206,114 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                 onCheckedChange={setIsExplicitMode}
                 className="data-[state=checked]:bg-rose-500"
               />
+            </div>
+          )}
+
+          {/* Selector de Modelo - Solo para Studio Admin */}
+          {isStudioAdmin && (
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-base font-medium text-foreground">
+                <Users className="h-4 w-4 text-primary" />
+                Selecciona una modelo
+              </label>
+              {loadingModels ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span className="ml-2 text-sm text-muted-foreground">Cargando modelos...</span>
+                </div>
+              ) : studioModels.length === 0 ? (
+                <div className="rounded-xl border-2 border-dashed border-muted p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No tienes modelos activos con fotos de entrenamiento.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ve a &quot;Mis Modelos&quot; para crear una modelo.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Select
+                    value={selectedModelId || ""}
+                    onValueChange={handleModelSelect}
+                  >
+                    <SelectTrigger className="w-full rounded-xl border-2 border-input bg-card px-4 py-3 text-base h-auto">
+                      <SelectValue placeholder="Selecciona una modelo para usar sus fotos..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {studioModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <div className="flex items-center gap-2">
+                            {model.training_photos?.[0] && (
+                              <img
+                                src={model.training_photos[0]}
+                                alt={model.display_name}
+                                className="h-6 w-6 rounded-full object-cover"
+                              />
+                            )}
+                            <span>{model.display_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({model.training_photos?.length || 0} fotos)
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Preview de fotos de la modelo seleccionada */}
+                  {selectedModel && selectedModel.training_photos?.length > 0 && (
+                    <div className="space-y-2 rounded-xl bg-secondary/30 p-4 border">
+                      <p className="text-sm font-medium text-foreground">
+                        Fotos de {selectedModel.display_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Se usaran como referencia para la generacion
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedModel.training_photos.slice(0, 6).map((url, index) => (
+                          <div
+                            key={index}
+                            className="relative h-14 w-14 overflow-hidden rounded-lg border-2 border-primary/30 ring-2 ring-primary/20"
+                          >
+                            <img
+                              src={url}
+                              alt={`Foto ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ))}
+                        {selectedModel.training_photos.length > 6 && (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-muted bg-muted/50">
+                            <span className="text-xs text-muted-foreground">
+                              +{selectedModel.training_photos.length - 6}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Toggle Modo Explicito para Studio Admin - solo si la modelo tiene contenido explicito */}
+                  {selectedModel?.is_explicit && (
+                    <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-rose-500/10 to-purple-500/10 border border-rose-500/20 p-4">
+                      <div className="flex items-center gap-3">
+                        <Flame className="h-5 w-5 text-rose-500" />
+                        <div>
+                          <p className="font-medium text-foreground">Modo Explicito</p>
+                          <p className="text-sm text-muted-foreground">
+                            Genera contenido exclusivo de {selectedModel.display_name}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={isExplicitMode}
+                        onCheckedChange={setIsExplicitMode}
+                        className="data-[state=checked]:bg-rose-500"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
