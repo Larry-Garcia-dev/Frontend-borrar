@@ -49,7 +49,7 @@ export function GenerationResult({ onOpenReport, onGenerateNew }: GenerationResu
   const images = currentGenerations.length > 0 
     ? currentGenerations 
     : (currentGeneration ? [currentGeneration] : []);
-  
+ 
   const selectedImage = images[selectedIndex] || null;
   const isApproved = selectedImage?.is_approved || false;
 

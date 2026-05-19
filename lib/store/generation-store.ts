@@ -213,7 +213,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }
   },
 
-  generate: async () => {
+ generate: async () => {
     const state = get();
     if (!state.prompt.trim()) {
       set({ error: "Por favor, ingresa un prompt" });
@@ -226,6 +226,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       progress: 0,
       taskStatus: "queued",
       currentGeneration: null,
+      currentGenerations: [], // Limpiar ambos
     });
 
     try {
@@ -249,12 +250,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       const task = await api.createGeneration(request);
       set({ taskId: task.task_id, taskStatus: task.status });
 
-      // Hacer polling hasta que termine
-      const result = await api.waitForGeneration(
+      // Usar waitForMultipleGenerations en lugar del sencillo
+      const results = await api.waitForMultipleGenerations(
         task.task_id,
-        (status, detail) => {
+        state.numImages, // Usar la cantidad solicitada
+        (status) => {
           set({ taskStatus: status });
-          // Incrementar progreso basado en status
           if (status === "pending" || status === "queued") {
             set({ progress: 10 });
           } else if (status === "started") {
@@ -265,30 +266,31 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
         }
       );
 
-      if (result) {
-        // Resolver URL de media
-        const resolvedResult = {
+      if (results && results.length > 0) {
+        // Resolver URLs de media para todos los resultados
+        const resolvedResults = results.map(result => ({
           ...result,
           storage_url: resolveMediaUrl(result.storage_url),
-        };
+        }));
+        
         set({
-          currentGeneration: resolvedResult,
-          generations: [resolvedResult, ...get().generations],
+          currentGeneration: resolvedResults[0],
+          currentGenerations: resolvedResults, // <-- AHORA SÍ GUARDAS EL ARRAY COMPLETO
+          generations: [...resolvedResults, ...get().generations],
           isGenerating: false,
           progress: 100,
           taskStatus: "success",
           parentMediaId: null,
           parentEditCount: 0,
         });
-        return resolvedResult;
+        return resolvedResults[0]; // Mantienes la compatibilidad devolviendo el primero
       }
 
       set({ isGenerating: false, progress: 0, taskStatus: "" });
       return null;
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : "Error al generar imagen",
+        error: error instanceof Error ? error.message : "Error al generar imagen",
         isGenerating: false,
         progress: 0,
         taskStatus: "failure",
@@ -398,6 +400,10 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       currentGeneration: state.currentGeneration?.id === mediaId 
         ? { ...state.currentGeneration, is_approved: true } 
         : state.currentGeneration
+      ,
+      currentGenerations: state.currentGenerations.map((g) =>
+         g.id === mediaId ? { ...g, is_approved: true } : g
+       )
     }));
   } catch (error) {
     console.error("Error al aprobar media:", error);
