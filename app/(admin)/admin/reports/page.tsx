@@ -2,18 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, UserPlus, Check, X, DollarSign, Image as ImageIcon, ZoomIn } from "lucide-react";
-import { toast } from "sonner";
+import { AlertTriangle, UserPlus, Check, X, DollarSign, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ImageModal } from "@/components/ui/image-modal";
-import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useAdminStore } from "@/lib/store/admin-store";
-import { resolveVendorMediaUrl } from "@/lib/api/config";
 import { formatDate, cn } from "@/lib/utils";
 
 export default function AdminReportsPage() {
-  const confirm = useConfirm();
   const { 
     reports, 
     modelRequests, 
@@ -30,17 +25,6 @@ export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState<"models" | "reports">("models");
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  
-  // Estado para el modal de imágenes
-  const [modalImages, setModalImages] = useState<string[]>([]);
-  const [modalIndex, setModalIndex] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const openImageModal = (images: string[], index: number) => {
-    setModalImages(images.map(img => resolveVendorMediaUrl(img)));
-    setModalIndex(index);
-    setIsModalOpen(true);
-  };
 
   useEffect(() => {
     fetchReports();
@@ -48,82 +32,33 @@ export default function AdminReportsPage() {
   }, [fetchReports, fetchModelRequests]);
 
   const handleApproveModel = async (id: string) => {
-    const confirmed = await confirm({
-      title: "Aprobar creacion de modelo",
-      message: "Se creara el usuario y perfil de la modelo. Esta accion no se puede deshacer.",
-      confirmText: "Aprobar",
-      variant: "success",
-    });
-    if (confirmed) {
-      const success = await approveModelRequest(id);
-      if (success) {
-        toast.success("Modelo aprobada correctamente");
-      } else {
-        toast.error("Error al aprobar la modelo");
-      }
+    if(confirm("¿Estás seguro de aprobar la creación de esta modelo?")) {
+      await approveModelRequest(id);
     }
   };
 
   const handleConfirmPayment = async (id: string) => {
-    const confirmed = await confirm({
-      title: "Confirmar pago recibido",
-      message: "Confirmas que has recibido el pago por la creacion de este perfil?",
-      confirmText: "Confirmar Pago",
-      variant: "warning",
-    });
-    if (confirmed) {
-      const success = await confirmModelPayment(id);
-      if (success) {
-        toast.success("Pago confirmado. Solicitud lista para aprobar.");
-      } else {
-        toast.error("Error al confirmar el pago");
-      }
+    if(confirm("¿Confirmas que has recibido el pago por la creación de este perfil?")) {
+      await confirmModelPayment(id);
     }
   };
 
   const handleRejectModel = async () => {
     if (!rejectingId || !rejectReason.trim()) return;
-    const success = await rejectModelRequest(rejectingId, rejectReason);
-    if (success) {
-      toast.success("Solicitud rechazada");
-    } else {
-      toast.error("Error al rechazar la solicitud");
-    }
+    await rejectModelRequest(rejectingId, rejectReason);
     setRejectingId(null);
     setRejectReason("");
   };
 
   const handleApproveReport = async (id: string) => {
-    const confirmed = await confirm({
-      title: "Aprobar reporte",
-      message: "Se reembolsara el credito al usuario y se eliminara la imagen.",
-      confirmText: "Aprobar y Reembolsar",
-      variant: "success",
-    });
-    if (confirmed) {
-      const success = await approveReport(id);
-      if (success) {
-        toast.success("Reporte aprobado. Credito reembolsado.");
-      } else {
-        toast.error("Error al aprobar el reporte");
-      }
+    if(confirm("¿Aprobar reporte y reembolsar crédito al usuario?")) {
+      await approveReport(id);
     }
   };
 
   const handleRejectReport = async (id: string) => {
-    const confirmed = await confirm({
-      title: "Rechazar reporte",
-      message: "El usuario no recibira reembolso. La imagen se mantendra.",
-      confirmText: "Rechazar",
-      variant: "danger",
-    });
-    if (confirmed) {
-      const success = await rejectReport(id, "Reporte rechazado por el administrador.");
-      if (success) {
-        toast.info("Reporte rechazado");
-      } else {
-        toast.error("Error al rechazar el reporte");
-      }
+    if(confirm("¿Rechazar este reporte? (No se reembolsará crédito)")) {
+      await rejectReport(id, "Reporte rechazado por el administrador.");
     }
   };
 
@@ -201,30 +136,12 @@ export default function AdminReportsPage() {
                           <p className="text-sm text-muted-foreground">Email: {req.model_email} | Estudio ID: {req.studio_id.slice(0,8)}...</p>
                           <p className="text-sm text-muted-foreground">Fecha: {formatDate(req.created_at)}</p>
                           
-                          {/* Fotos Previas - Clickeables para abrir modal */}
+                          {/* Fotos Previas */}
                           {req.training_photos?.length > 0 && (
-                            <div className="mt-4">
-                              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                                <ZoomIn className="h-4 w-4" /> Fotos de entrenamiento ({req.training_photos.length})
-                              </p>
-                              <div className="flex gap-2 overflow-x-auto pb-2">
-                                {req.training_photos.map((photo, i) => (
-                                  <button
-                                    key={i}
-                                    onClick={() => openImageModal(req.training_photos, i)}
-                                    className="relative h-20 w-20 rounded-lg overflow-hidden flex-shrink-0 border hover:border-primary hover:ring-2 hover:ring-primary/20 transition-all group"
-                                  >
-                                    <img 
-                                      src={resolveVendorMediaUrl(photo)} 
-                                      alt={`Foto ${i + 1}`} 
-                                      className="h-full w-full object-cover" 
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                      <ZoomIn className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
+                            <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                              {req.training_photos.map((photo, i) => (
+                                <img key={i} src={photo} alt="Training preview" className="h-16 w-16 object-cover rounded-lg flex-shrink-0 border" />
+                              ))}
                             </div>
                           )}
                         </div>
@@ -344,15 +261,6 @@ export default function AdminReportsPage() {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Modal de Imágenes */}
-      <ImageModal
-        images={modalImages}
-        currentIndex={modalIndex}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onNavigate={setModalIndex}
-      />
     </div>
   );
 }

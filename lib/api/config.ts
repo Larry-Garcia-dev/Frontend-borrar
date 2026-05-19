@@ -1,9 +1,4 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-export const API_AUTH_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:4000";
-export const API_ADMIN_BASE_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || "http://localhost:4001";
-export const API_VENDOR_BASE_URL = process.env.NEXT_PUBLIC_VENDOR_API_URL || "http://localhost:4002"; 
-export const API_GENERATION_BASE_URL = process.env.NEXT_PUBLIC_GENERATION_API_URL || "http://localhost:3003";
-
 export const API_PREFIX = "/api/v1";
 export const API_PREFIX_ADMIN = "/api/admin";
 export const API_PREFIX_VENDOR = "/api/vendor";
@@ -11,22 +6,8 @@ export const API_PREFIX_VENDOR = "/api/vendor";
 export function resolveMediaUrl(url: string): string {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  
-  // NUEVA REGLA: Si la imagen es generada, va directo al microservicio de generación (Puerto 3003)
-  if (url.startsWith("/generadas")) return `${API_GENERATION_BASE_URL}${url}`;
-  
-  // Para el resto de cosas, usa la base normal
   if (url.startsWith("/")) return `${API_BASE_URL}${url}`;
   return url;
-}
-
-export function resolveVendorMediaUrl(url: string): string {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  // Las imagenes generadas estan en /generadas y las sirve el generation-service
-  if (url.startsWith("/generadas")) return `${API_GENERATION_BASE_URL}${url}`;
-  if (url.startsWith("/")) return `${API_VENDOR_BASE_URL}${url}`;
-  return `${API_VENDOR_BASE_URL}/${url}`;
 }
 
 export function getTokenFromCookie(): string | null {

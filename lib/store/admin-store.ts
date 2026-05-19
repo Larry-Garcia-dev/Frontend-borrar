@@ -127,49 +127,31 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   approveModelRequest: async (requestId) => {
     set({ isLoading: true, error: null });
     try { 
-      const result = await api.approveModelRequest(requestId); 
-      // Si la solicitud se completo o paso a pago pendiente, refrescar lista
-      await get().fetchModelRequests();
-      set({ isLoading: false });
+      await api.approveModelRequest(requestId); 
+      await get().fetchModelRequests(); // Recargamos para ver si pasó a PAYMENT_PENDING o se completó
       return true; 
     } 
-    catch (e: any) { 
-      const errorMsg = e?.message || e?.detail || 'Error al aprobar la modelo';
-      set({ error: errorMsg, isLoading: false }); 
-      return false; 
-    }
+    catch (e: any) { set({ error: e.message, isLoading: false }); return false; }
   },
 
   rejectModelRequest: async (requestId, reason) => {
     set({ isLoading: true, error: null });
     try { 
       await api.rejectModelRequest(requestId, reason); 
-      set((state) => ({ 
-        modelRequests: state.modelRequests.filter((r) => r.id !== requestId), 
-        isLoading: false 
-      })); 
+      set((state) => ({ modelRequests: state.modelRequests.filter((r) => r.id !== requestId), isLoading: false })); 
       return true; 
     } 
-    catch (e: any) { 
-      const errorMsg = e?.message || e?.detail || 'Error al rechazar la solicitud';
-      set({ error: errorMsg, isLoading: false }); 
-      return false; 
-    }
+    catch (e: any) { set({ error: e.message, isLoading: false }); return false; }
   },
 
   confirmModelPayment: async (requestId) => {
     set({ isLoading: true, error: null });
     try { 
       await api.confirmModelPayment(requestId); 
-      await get().fetchModelRequests();
-      set({ isLoading: false });
+      await get().fetchModelRequests(); // Recargamos para ver si volvió a PENDING
       return true; 
     } 
-    catch (e: any) { 
-      const errorMsg = e?.message || e?.detail || 'Error al confirmar el pago';
-      set({ error: errorMsg, isLoading: false }); 
-      return false; 
-    }
+    catch (e: any) { set({ error: e.message, isLoading: false }); return false; }
   },
 
   clearError: () => set({ error: null }),

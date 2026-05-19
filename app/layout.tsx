@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/auth-provider";
-import { Toaster } from "@/components/ui/sonner";
-import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,10 +29,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} bg-background`}>
       <body className="min-h-screen font-sans antialiased">
-        <ConfirmProvider>
-          <AuthProvider>{children}</AuthProvider>
-          <Toaster position="top-right" richColors closeButton />
-        </ConfirmProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
