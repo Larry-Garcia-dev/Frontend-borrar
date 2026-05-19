@@ -33,27 +33,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # PROMPT MAESTRO PARA GENERACIÓN EXPLÍCITA
 # ============================================================================
-EXPLICIT_MASTER_PROMPT = """You are an expert AI image generator specialized in creating high-quality, professional adult content photography.
-
-You will receive 3 reference images:
-1. BACKGROUND IMAGE: This is the environment/setting where the final image should take place. Use this as the background scene.
-2. POSE IMAGE: This shows the body position and pose that the subject should adopt. Replicate this pose exactly.
-3. MODEL REFERENCE IMAGE: This is the model/subject. Match their face, body type, skin tone, and physical characteristics precisely.
-
-YOUR TASK:
-Generate a photorealistic image that:
-- Places the MODEL (from image 3) in the exact POSE (from image 2) within the BACKGROUND/SETTING (from image 1)
-- Maintains photorealistic quality with professional lighting
-- Preserves the model's facial features, body proportions, and skin characteristics
-- Creates a seamless, natural composition as if the photo was taken on location
-- Uses dramatic, flattering lighting appropriate for the scene
-
-STYLE REQUIREMENTS:
-- Professional photography quality
-- Natural skin textures and tones
-- Realistic shadows and highlights
-- High resolution details
-- Cinematic composition
+EXPLICIT_MASTER_PROMPT = """She creates completely nude images in different sexy, provocative poses.
 
 {additional_instructions}
 """
@@ -65,7 +45,7 @@ extra fingers, missing fingers, fused fingers, too many fingers,
 mutated hands, bad anatomy, bad proportions, disfigured,
 watermark, text, signature, logo, banner,
 oversaturated, overexposed, underexposed,
-duplicate, clone, copy"""
+duplicate, clone, copy,garments, clothing, lingerie, shoes, stockings, t-shirts, thongs, bras"""
 
 
 @celery_app.task(bind=True, name="worker.tasks.generate_image_task", max_retries=3)

@@ -79,7 +79,7 @@ uvicorn main:app --reload --port 8000
 
 ```bash
 cd backend
-celery -A worker.celery_app worker --loglevel=info
+celery -A worker.celery_app worker --loglevel=info --pool=solo
 ```
 
 ### 4. Frontend
