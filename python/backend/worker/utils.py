@@ -232,6 +232,10 @@ def _persist_media(
             insert_values["parent_media_id"] = uuid.UUID(str(parent_media_id))
         if "edit_count" in media_columns:
             insert_values["edit_count"] = 0
+            # 👇 --- AGREGA ESTAS DOS LÍNEAS AQUÍ --- 👇
+        if "is_approved" in media_columns:
+            insert_values["is_approved"] = False
+        # 👆 ----------------------------------- 👆
 
         db.execute(media_table.insert().values(**insert_values))
         db.commit()
