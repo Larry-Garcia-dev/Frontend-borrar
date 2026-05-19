@@ -67,8 +67,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
         try {
           const profile = await api.getMyProfile();
           setModelProfile(profile);
-        } catch (err) {
-          console.log("[v0] No model profile found");
+        } catch {
+          // Sin perfil de modelo
         } finally {
           setLoadingProfile(false);
         }
@@ -89,8 +89,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             (m) => ["ACTIVE", "APPROVED", "READY"].includes(m.status) && m.training_photos?.length > 0
           );
           setStudioModels(activeModels);
-        } catch (err) {
-          console.log("[v0] Error loading studio models");
+        } catch {
+          // Error cargando modelos
         } finally {
           setLoadingModels(false);
         }
@@ -105,6 +105,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   // Manejar seleccion de modelo
   const handleModelSelect = (modelId: string) => {
     setSelectedModelId(modelId);
+    // Resetear modo explicito cuando cambia de modelo
+    setIsExplicitMode(false);
     const model = studioModels.find((m) => m.id === modelId);
     if (model && model.training_photos?.length > 0) {
       // Usar las fotos de entrenamiento como referencia
@@ -112,12 +114,22 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     }
   };
 
-  // Si es modo explícito y tiene perfil, mostrar el formulario explícito
+  // Si es modo explícito y tiene perfil (modelo), mostrar el formulario explícito
   if (isExplicitMode && modelProfile?.is_explicit && modelProfile) {
     return (
       <ExplicitGenerationForm 
         onGenerateStart={onGenerateStart} 
         modelProfile={modelProfile}
+      />
+    );
+  }
+
+  // Si es Studio Admin en modo explícito con modelo seleccionada, mostrar formulario explícito
+  if (isExplicitMode && isStudioAdmin && selectedModel?.is_explicit && selectedModel) {
+    return (
+      <ExplicitGenerationForm 
+        onGenerateStart={onGenerateStart} 
+        modelProfile={selectedModel}
       />
     );
   }
@@ -278,6 +290,26 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Toggle Modo Explicito para Studio Admin - solo si la modelo tiene contenido explicito */}
+                  {selectedModel?.is_explicit && (
+                    <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-rose-500/10 to-purple-500/10 border border-rose-500/20 p-4">
+                      <div className="flex items-center gap-3">
+                        <Flame className="h-5 w-5 text-rose-500" />
+                        <div>
+                          <p className="font-medium text-foreground">Modo Explicito</p>
+                          <p className="text-sm text-muted-foreground">
+                            Genera contenido exclusivo de {selectedModel.display_name}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={isExplicitMode}
+                        onCheckedChange={setIsExplicitMode}
+                        className="data-[state=checked]:bg-rose-500"
+                      />
                     </div>
                   )}
                 </>

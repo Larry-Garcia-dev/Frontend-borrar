@@ -10,8 +10,7 @@ import { ReportModal } from "@/components/dashboard/report-modal";
 export default function DashboardPage() {
   const { fetchPromptTemplates, fetchGenerations, generate } = useGenerationStore();
 
-  // Estado que coordina la comunicación entre componentes
-  const [isApproved, setIsApproved] = useState(false);
+  // Estado para el modal de reporte
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportingMediaId, setReportingMediaId] = useState<string | null>(null);
 
@@ -26,7 +25,6 @@ export default function DashboardPage() {
   };
 
   const handleGenerateNew = async () => {
-    setIsApproved(false);
     await generate();
   };
 
@@ -47,12 +45,10 @@ export default function DashboardPage() {
       {/* Grid Layout */}
       <div className="flex flex-col gap-4 sm:gap-8 lg:flex-row lg:gap-8">
         <GenerationForm 
-          onGenerateStart={() => setIsApproved(false)} 
+          onGenerateStart={() => {}} 
         />
         
         <GenerationResult 
-          isApproved={isApproved}
-          onApprove={() => setIsApproved(true)}
           onOpenReport={handleOpenReport}
           onGenerateNew={handleGenerateNew}
         />
