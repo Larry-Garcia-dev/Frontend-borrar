@@ -19,6 +19,8 @@ import { useAuthStore } from "@/lib/store/auth-store";
 import { api } from "@/lib/api-client";
 import { ModelProfile } from "@/lib/api/types";
 import { ExplicitGenerationForm } from "./explicit-generation-form";
+// IMPORTANTE: Asegúrate de importar el componente implícito
+import { ImplicitGenerationForm } from "./implicit-generation-form";
 
 const SIZE_OPTIONS = [
   { value: "1080x1080 (1:1)", label: "1080 x 1080 (Carrusel/Cuadrado 1:1)", width: 1080, height: 1080 },
@@ -44,6 +46,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     isExplicitMode, setIsExplicitMode,
     numImages, setNumImages,
   } = useGenerationStore();
+  
   const [modelProfile, setModelProfile] = useState<ModelProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   
@@ -51,6 +54,9 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   const [studioModels, setStudioModels] = useState<ModelProfile[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
+
+  // NUEVO: Estado para manejar el modo implícito
+  const [isImplicitMode, setIsImplicitMode] = useState(false);
   
   const isModelo = user?.role === "MODELO";
   const isStudioAdmin = user?.isStudioAdmin || user?.role === "ESTUDIO_ADMIN";
@@ -105,8 +111,10 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
   // Manejar seleccion de modelo
   const handleModelSelect = (modelId: string) => {
     setSelectedModelId(modelId);
-    // Resetear modo explicito cuando cambia de modelo
+    // Resetear ambos modos cuando cambia de modelo
     setIsExplicitMode(false);
+    setIsImplicitMode(false);
+    
     const model = studioModels.find((m) => m.id === modelId);
     if (model && model.training_photos?.length > 0) {
       // Usar las fotos de entrenamiento como referencia
@@ -124,10 +132,20 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
     );
   }
 
-  // Si es Studio Admin en modo explícito con modelo seleccionada, mostrar formulario explícito
+  // Si es Studio Admin en modo explícito con modelo seleccionada
   if (isExplicitMode && isStudioAdmin && selectedModel?.is_explicit && selectedModel) {
     return (
       <ExplicitGenerationForm 
+        onGenerateStart={onGenerateStart} 
+        modelProfile={selectedModel}
+      />
+    );
+  }
+
+  // NUEVO: Si es Studio Admin en modo implícito con modelo seleccionada
+  if (isImplicitMode && isStudioAdmin && selectedModel) {
+    return (
+      <ImplicitGenerationForm 
         onGenerateStart={onGenerateStart} 
         modelProfile={selectedModel}
       />
@@ -158,7 +176,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
 
   const handleGenerate = async () => {
     clearError();
-    onGenerateStart(); // Resetea el estado de isApproved en el componente padre
+    onGenerateStart(); 
     await generate();
   };
 
@@ -292,26 +310,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                       </div>
                     </div>
                   )}
-
-                  {/* Toggle Modo Explicito para Studio Admin - solo si la modelo tiene contenido explicito */}
-                  {selectedModel?.is_explicit && (
-                    <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-rose-500/10 to-purple-500/10 border border-rose-500/20 p-4">
-                      <div className="flex items-center gap-3">
-                        <Flame className="h-5 w-5 text-rose-500" />
-                        <div>
-                          <p className="font-medium text-foreground">Modo Explicito</p>
-                          <p className="text-sm text-muted-foreground">
-                            Genera contenido exclusivo de {selectedModel.display_name}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={isExplicitMode}
-                        onCheckedChange={setIsExplicitMode}
-                        className="data-[state=checked]:bg-rose-500"
-                      />
-                    </div>
-                  )}
+                  {/* Se eliminó de aquí el Switch original de Modo Explícito para el Studio Admin */}
                 </>
               )}
             </div>
@@ -335,7 +334,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </div>
           )}
 
-          {/* 1. Prompt Principal */}
+          {/* 1. Prompt Principal (SE MANTIENE EL TEXTAREA) */}
           <div className="space-y-2 sm:space-y-3">
             <label className="block text-base sm:text-lg font-semibold text-foreground">
               Describe tu imagen
@@ -348,7 +347,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             />
           </div>
 
-          {/* 2. Selector de Plantillas (NUEVA FUNCIONALIDAD) */}
+          {/* 2. Selector de Plantillas */}
           {promptTemplates.length > 0 && (
             <div className="space-y-3">
               <label className="block text-base font-medium text-foreground">
@@ -448,17 +447,45 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </motion.div>
           )}
 
-          <Button
-            variant="gradient"
-            size="xl"
-            className="w-full"
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim() || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}
-            isLoading={isGenerating}
-          >
-            {!isGenerating && <Sparkles className="h-6 w-6" />}
-            {isGenerating ? "Generando..." : isEditing ? "Generar edición" : "Generar Imagen"}
-          </Button>
+          {/* ACCIONES DEL FORMULARIO */}
+          {(!isEditing && isStudioAdmin) ? (
+            // Vista de dos botones (Explicito / Implicito) para el Studio Admin creando imagen nueva
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <Button
+                variant="outline"
+                size="xl"
+                className="w-full border-primary/50 text-primary hover:bg-primary/10"
+                onClick={() => setIsImplicitMode(true)}
+                disabled={!prompt.trim() || !selectedModel || isGenerating || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}               >
+                <Sparkles className="mr-2 h-5 w-5" />
+                Generar Implícito
+              </Button>
+              <Button
+                variant="gradient"
+                size="xl"
+                className="w-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700"
+                onClick={() => setIsExplicitMode(true)}
+                // Se deshabilita si la modelo no permite contenido explicito
+                disabled={!selectedModel?.is_explicit || isGenerating || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}
+              >
+                <Flame className="mr-2 h-5 w-5" />
+                Generar Explícito
+              </Button>
+            </div>
+          ) : (
+            // Vista tradicional de 1 botón (para edición o para usuarios normales)
+            <Button
+              variant="gradient"
+              size="xl"
+              className="w-full"
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt.trim() || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}
+              isLoading={isGenerating}
+            >
+              {!isGenerating && <Sparkles className="mr-2 h-6 w-6" />}
+              {isGenerating ? "Generando..." : isEditing ? "Generar edición" : "Generar Imagen"}
+            </Button>
+          )}
 
           {!user?.isUnlimited && !editIsFree && remainingCredits <= 0 && (
             <p className="text-center text-sm text-destructive">No tienes créditos disponibles. Contacta al administrador.</p>
