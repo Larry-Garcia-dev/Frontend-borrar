@@ -278,13 +278,21 @@ async def create_explicit_generation(
     if user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado.")
     
-    # Verificar que el usuario es modelo y tiene contenido explícito habilitado
-    if user.role != UserRole.MODELO:
+    # Verificar que el usuario es modelo o estudio admin y tiene contenido explícito habilitado
+    if user.role != UserRole.ESTUDIO_ADMIN and user.role != UserRole.MODELO:
         raise HTTPException(status_code=403, detail="Solo modelos pueden generar contenido explícito.")
     
     profile = db.query(ModelProfile).filter(ModelProfile.user_id == user.id).first()
-    if not profile or not profile.is_explicit:
-        raise HTTPException(status_code=403, detail="No tienes habilitado el contenido explícito.")
+    if user.role not in [UserRole.ESTUDIO_ADMIN, UserRole.MODELO]:
+        raise HTTPException(status_code=403, detail="No tienes permisos para generar contenido explícito.")
+    
+    if user.role == UserRole.MODELO:
+        profile = db.query(ModelProfile).filter(ModelProfile.user_id == user.id).first()
+        if not profile or not profile.is_explicit:
+            raise HTTPException(status_code=403, detail="Modelo no tiene habilitado el contenido explícito.")
+        
+#        if not profile or not profile.is_explicit:
+#        raise HTTPException(status_code=403, detail="No tienes habilitado el contenido explícito.")
     
     # Consumir crédito
     try:
