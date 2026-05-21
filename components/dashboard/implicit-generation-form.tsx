@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X } from "lucide-react";
+import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +24,7 @@ const BACKGROUNDS = [
   { id: "studio", name: "Estudio Foto", image: "/backgrounds/studio.jpg" },
 ];
 
-type Step = "background" | "pose" | "objects" | "confirm";
+type Step = "background" | "pose" | "objects" | "clothing" | "confirm";
 
 // Función para convertir una imagen URL a base64 (para los fondos predefinidos)
 async function imageUrlToBase64(url: string): Promise<string> {
@@ -42,7 +42,7 @@ async function imageUrlToBase64(url: string): Promise<string> {
   });
 }
 
-// NUEVA FUNCIÓN: Convertir archivo subido a base64
+// Convertir archivo subido a base64
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -70,12 +70,16 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
   const [step, setStep] = useState<Step>("background");
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
   
-  // Paso 2: Pose ahora es texto
+  // Paso 2: Pose
   const [posePrompt, setPosePrompt] = useState<string>("");
   
-  // Paso 3: Objetos subidos
+  // Paso 3: Objetos
   const [objectFiles, setObjectFiles] = useState<File[]>([]);
   const [extendedPrompt, setExtendedPrompt] = useState<string>("");
+
+  // Paso 4: Ropa (NUEVO)
+  const [clothingFiles, setClothingFiles] = useState<File[]>([]);
+  const [clothingPrompt, setClothingPrompt] = useState<string>("");
   
   // Otros estados
   const [additionalPrompt, setAdditionalPrompt] = useState<string>("");
@@ -85,7 +89,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
     ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
     : 0;
 
-  // Manejador para subir archivos
+  // Manejador para subir objetos
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
@@ -101,13 +105,24 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
     setObjectFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // Manejador para subir ropa (NUEVO)
+  const handleClothingUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setClothingFiles(prev => {
+        const newFiles = [...prev, ...files];
+        return newFiles.slice(0, 4); // Límite de 4 imágenes
+      });
+    }
+    e.target.value = "";
+  };
+
+  const removeClothingFile = (indexToRemove: number) => {
+    setClothingFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
   // Validaciones de paso
   const canProceedToObjects = posePrompt.trim().length > 0;
-  // Permitimos avanzar a confirmación incluso sin objetos subidos si es opcional, pero ajustado a requerimientos.
-  // Asumiendo que pueden avanzar con o sin imágenes, pero al menos debe ser válido el paso.
-  const canProceedToConfirm = true; 
-  
-  // Validación final
   const canGenerate = selectedBackground && posePrompt.trim().length > 0;
 
   const handleGenerate = async () => {
@@ -123,34 +138,31 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
         throw new Error("Fondo no encontrado");
       }
 
-      // Obtener las fotos de entrenamiento de la modelo (URLs)
       const trainingPhotos = modelProfile.training_photos || [];
       
       console.log("[v0] Implicit Generation - Starting...");
-      console.log("[v0] Background:", background.name, background.image);
-      console.log("[v0] Pose prompt:", posePrompt);
-      console.log("[v0] Object files count:", objectFiles.length);
-      console.log("[v0] Model training photos (URLs):", trainingPhotos);
 
       // 1. Convertir fondo predefinido a base64
       const backgroundB64 = await imageUrlToBase64(background.image);
-      console.log("[v0] Background B64 length:", backgroundB64.length);
 
       // 2. Convertir archivos de objetos subidos a base64
       const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
-      console.log("[v0] Objects B64 lengths:", objectsB64.map(o => o.length));
 
-      // 3. Usar las URLs de las fotos de entrenamiento directamente
-      // El backend las resolverá a base64
-      const modelPhotoUrls = trainingPhotos.slice(0, 4); // Tomar hasta 4 fotos
-      console.log("[v0] Model photo URLs to send:", modelPhotoUrls);
+      // 3. Convertir archivos de ropa a base64 (NUEVO)
+      const clothingB64 = await Promise.all(clothingFiles.map(file => fileToBase64(file)));
 
-      // Combinar URLs de la modelo + objetos en base64
-      const allReferences = [...modelPhotoUrls, ...objectsB64];
-      console.log("[v0] Total references (URLs + base64):", allReferences.length);
+      // 4. Usar las URLs de las fotos de entrenamiento directamente
+      const modelPhotoUrls = trainingPhotos.slice(0, 4); 
 
-      // Construir prompt combinado
+      // Combinar URLs de la modelo + objetos en base64 + ropa en base64
+      const allReferences = [...modelPhotoUrls, ...objectsB64, ...clothingB64];
+
+      // Construir prompt combinado incluyendo la ropa
       let fullPrompt = `${background.name} setting. Pose: ${posePrompt.trim()}`;
+      
+      if (clothingFiles.length > 0 || clothingPrompt.trim()) {
+        fullPrompt += `. Wearing specific clothing/outfit: ${clothingPrompt.trim() || "as shown in the reference images"}`;
+      }
       if (extendedPrompt.trim()) {
         fullPrompt += `. Objects/Details: ${extendedPrompt.trim()}`;
       }
@@ -160,25 +172,16 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
 
       const requestData = {
         background_b64: backgroundB64,
-        pose_b64: "", // No usamos imagen de pose predefinida en implícito
-        reference_url: modelPhotoUrls[0] || "", // Primera foto de la modelo (URL)
-        reference_urls: allReferences, // URLs de la modelo + objetos base64
+        pose_b64: "", 
+        reference_url: modelPhotoUrls[0] || "", 
+        reference_urls: allReferences, 
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
         num_images: numImages,
       };
 
-      console.log("[v0] Sending to API - request data:", {
-        background_b64_length: requestData.background_b64.length,
-        pose_b64_length: requestData.pose_b64.length,
-        reference_url: requestData.reference_url,
-        reference_urls_count: requestData.reference_urls.length,
-        reference_urls_sample: requestData.reference_urls.slice(0, 2).map(r => r.substring(0, 50)),
-        additional_prompt: requestData.additional_prompt,
-        num_images: requestData.num_images,
-      });
-
+      console.log("[v0] Sending to API - Request prepared.");
       await generateExplicit(requestData);
     } catch (err: any) {
       console.error("[v0] Implicit generation error:", err);
@@ -194,11 +197,13 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       case "background": return 1;
       case "pose": return 2;
       case "objects": return 3;
-      case "confirm": return 4;
+      case "clothing": return 4;
+      case "confirm": return 5;
     }
   };
 
   const currentStepNum = getStepNumber(step);
+  const stepLabels = ["Fondo", "Pose", "Objetos", "Ropa", "Generar"];
 
   return (
     <motion.div 
@@ -226,10 +231,10 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
 
           {/* Progress Steps */}
           <div className="flex items-center justify-between mt-4">
-            {["Fondo", "Pose", "Objetos", "Generar"].map((label, idx) => (
-              <div key={label} className="flex items-center">
+            {stepLabels.map((label, idx) => (
+              <div key={label} className="flex items-center flex-1 last:flex-none">
                 <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all",
+                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all shrink-0",
                   idx + 1 <= currentStepNum 
                     ? "bg-rose-500 text-white" 
                     : "bg-muted text-muted-foreground"
@@ -237,14 +242,14 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                   {idx + 1 < currentStepNum ? <Check className="h-4 w-4" /> : idx + 1}
                 </div>
                 <span className={cn(
-                  "ml-2 text-xs hidden sm:inline",
+                  "ml-2 text-xs hidden sm:inline whitespace-nowrap",
                   idx + 1 <= currentStepNum ? "text-rose-300" : "text-muted-foreground"
                 )}>
                   {label}
                 </span>
-                {idx < 3 && (
+                {idx < stepLabels.length - 1 && (
                   <div className={cn(
-                    "w-8 sm:w-12 h-0.5 mx-2",
+                    "w-full h-0.5 mx-2 min-w-[10px]",
                     idx + 1 < currentStepNum ? "bg-rose-500" : "bg-muted"
                   )} />
                 )}
@@ -255,6 +260,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
 
         <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
           <AnimatePresence mode="wait">
+            
             {/* Step 1: Seleccionar Fondo */}
             {step === "background" && (
               <motion.div
@@ -403,7 +409,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">
-                    Prompt Extendido
+                    Prompt Extendido de Objetos
                   </label>
                   <Textarea
                     value={extendedPrompt}
@@ -422,6 +428,87 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                   </Button>
                   <Button
+                    onClick={() => goToStep("clothing")}
+                    className="bg-rose-500 hover:bg-rose-600"
+                  >
+                    Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 4: Ropa (NUEVO PASO) */}
+            {step === "clothing" && (
+              <motion.div
+                key="clothing"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                    <Shirt className="h-5 w-5 text-rose-400" />
+                    Ropa (Opcional)
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Sube imágenes de la ropa que deseas que vista la modelo (hasta 4 prendas).
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    {clothingFiles.map((file, index) => (
+                      <div key={index} className="relative h-20 w-20 overflow-hidden rounded-lg border border-rose-500/30">
+                        <img 
+                          src={URL.createObjectURL(file)} 
+                          alt={`Prenda ${index + 1}`} 
+                          className="h-full w-full object-cover" 
+                        />
+                        <button
+                          onClick={() => removeClothingFile(index)}
+                          className="absolute -right-1 -top-1 rounded-full bg-destructive p-1 text-destructive-foreground z-10"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {clothingFiles.length < 4 && (
+                      <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-rose-500/30 transition-colors hover:border-rose-500 bg-rose-500/5">
+                        <Upload className="h-5 w-5 text-rose-400 mb-1" />
+                        <span className="text-[10px] text-rose-400">Subir</span>
+                        <input 
+                          type="file" 
+                          accept="image/png,image/jpeg,image/webp" 
+                          multiple 
+                          onChange={handleClothingUpload} 
+                          className="hidden" 
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Descripción del atuendo
+                  </label>
+                  <Textarea
+                    value={clothingPrompt}
+                    onChange={(e) => setClothingPrompt(e.target.value)}
+                    placeholder="Describe cómo se llevan las prendas (ej. chaqueta abierta sobre camiseta blanca, pantalones ajustados...)"
+                    className="min-h-[100px] bg-background/50 border-rose-500/20 focus:border-rose-500/50 resize-none text-sm"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {clothingPrompt.length}/500 caracteres
+                  </p>
+                </div>
+
+                <div className="flex justify-between pt-2">
+                  <Button variant="outline" onClick={() => goToStep("objects")}>
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <Button
                     onClick={() => goToStep("confirm")}
                     className="bg-rose-500 hover:bg-rose-600"
                   >
@@ -431,7 +518,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
               </motion.div>
             )}
 
-            {/* Step 4: Confirmar y Generar */}
+            {/* Step 5: Confirmar y Generar */}
             {step === "confirm" && (
               <motion.div
                 key="confirm"
@@ -473,31 +560,39 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                   </div>
                 </div>
 
-                {/* Objetos y Prompt Extendido */}
-                {(objectFiles.length > 0 || extendedPrompt) && (
-                  <div className="space-y-3 border-t border-rose-500/20 pt-4">
-                    <p className="text-sm font-medium text-foreground">Detalles de la escena</p>
-                    
-                    {objectFiles.length > 0 && (
-                      <div className="flex gap-2">
-                        {objectFiles.map((file, idx) => (
-                          <div key={idx} className="h-12 w-12 rounded border border-rose-500/30 overflow-hidden">
-                            <img src={URL.createObjectURL(file)} className="h-full w-full object-cover" alt="Objeto" />
-                          </div>
-                        ))}
+                {/* Objetos y Ropa Subida */}
+                <div className="space-y-3 border-t border-rose-500/20 pt-4">
+                  {(objectFiles.length > 0 || clothingFiles.length > 0) && (
+                    <p className="text-sm font-medium text-foreground">Referencias Adicionales (Objetos/Ropa)</p>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {objectFiles.map((file, idx) => (
+                      <div key={`obj-${idx}`} className="h-12 w-12 rounded border border-rose-500/30 overflow-hidden">
+                        <img src={URL.createObjectURL(file)} className="h-full w-full object-cover" alt="Objeto" />
                       </div>
-                    )}
-                    
-                    {extendedPrompt && (
-                      <p className="text-xs text-muted-foreground italic">
-                        {extendedPrompt}
-                      </p>
-                    )}
+                    ))}
+                    {clothingFiles.map((file, idx) => (
+                      <div key={`cloth-${idx}`} className="h-12 w-12 rounded border border-purple-500/30 overflow-hidden">
+                        <img src={URL.createObjectURL(file)} className="h-full w-full object-cover" alt="Prenda" />
+                      </div>
+                    ))}
                   </div>
-                )}
+                  
+                  {extendedPrompt && (
+                    <p className="text-xs text-muted-foreground italic">
+                      <span className="font-semibold not-italic">Objetos:</span> {extendedPrompt}
+                    </p>
+                  )}
+                  {clothingPrompt && (
+                    <p className="text-xs text-muted-foreground italic">
+                      <span className="font-semibold not-italic">Atuendo:</span> {clothingPrompt}
+                    </p>
+                  )}
+                </div>
 
                 {/* Selector de Cantidad de Imágenes */}
-                <div className="space-y-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-4">
+                <div className="space-y-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-4 mt-4">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Images className="h-4 w-4 text-rose-400" />
@@ -533,7 +628,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                 )}
 
                 <div className="flex justify-between pt-2">
-                  <Button variant="outline" onClick={() => goToStep("objects")} disabled={isGenerating}>
+                  <Button variant="outline" onClick={() => goToStep("clothing")} disabled={isGenerating}>
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                   </Button>
                   <Button
