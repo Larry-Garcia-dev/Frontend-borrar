@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, RefreshCw, Images } from "lucide-react";
+import { RefreshCw,Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,18 +25,18 @@ const BACKGROUNDS = [
 ];
 
 // Poses disponibles (usando las mismas del entrenamiento explícito)
-const POSES = [
-  { id: "pose-1", name: "De pie", image: "/poses/explicit/pose-1.jpg" },
-  { id: "pose-2", name: "Arrodillada", image: "/poses/explicit/pose-2.jpg" },
-  { id: "pose-3", name: "Acostada", image: "/poses/explicit/pose-3.jpg" },
-  { id: "pose-4", name: "En cuatro", image: "/poses/explicit/pose-4.jpg" },
-  { id: "pose-5", name: "Inclinada", image: "/poses/explicit/pose-5.jpg" },
-  { id: "pose-6", name: "Sentada", image: "/poses/explicit/pose-6.jpg" },
-  { id: "pose-7", name: "Boca abajo", image: "/poses/explicit/pose-7.jpg" },
-  { id: "pose-8", name: "Arqueada", image: "/poses/explicit/pose-8.jpg" },
-];
+// const POSES = [
+//   { id: "pose-1", name: "De pie", image: "/poses/explicit/pose-1.jpg" },
+//   { id: "pose-2", name: "Arrodillada", image: "/poses/explicit/pose-2.jpg" },
+//   { id: "pose-3", name: "Acostada", image: "/poses/explicit/pose-3.jpg" },
+//   { id: "pose-4", name: "En cuatro", image: "/poses/explicit/pose-4.jpg" },
+//   { id: "pose-5", name: "Inclinada", image: "/poses/explicit/pose-5.jpg" },
+//   { id: "pose-6", name: "Sentada", image: "/poses/explicit/pose-6.jpg" },
+//   { id: "pose-7", name: "Boca abajo", image: "/poses/explicit/pose-7.jpg" },
+//   { id: "pose-8", name: "Arqueada", image: "/poses/explicit/pose-8.jpg" },
+// ];
 
-type Step = "background" | "pose" | "photo" | "confirm";
+type Step = "background" | "pose" | "objects" | "confirm";
 
 // Función para convertir una imagen URL a base64
 async function imageUrlToBase64(url: string): Promise<string> {
@@ -46,12 +46,25 @@ async function imageUrlToBase64(url: string): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64 = reader.result as string;
-      // Remover el prefijo "data:image/...;base64," para obtener solo el base64
       const base64Data = base64.split(',')[1];
       resolve(base64Data);
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
+  });
+}
+
+// Función para convertir un archivo subido a base64
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      const base64Data = base64.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 
@@ -68,77 +81,80 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
   const [step, setStep] = useState<Step>("background");
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
-  const [selectedPose, setSelectedPose] = useState<string | null>(null);
-  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  
+  // Paso 2: Pose ahora es texto
+  const [posePrompt, setPosePrompt] = useState<string>("");
+  
+  // Paso 3: Objetos subidos y su descripción
+  const [objectFiles, setObjectFiles] = useState<File[]>([]);
+  const [objectPrompt, setObjectPrompt] = useState<string>("");
+
   const [additionalPrompt, setAdditionalPrompt] = useState<string>("");
-  const [randomSeed, setRandomSeed] = useState(0);
   const [numImages, setNumImages] = useState(3);
 
   const trainingPhotos = modelProfile.explicit_training_photos || [];
 
-  // Función para obtener 4 fotos aleatorias
+  // Función para obtener 4 fotos aleatorias ocultas de la modelo para enviar como referencia
   const getRandomPhotos = useCallback((photos: string[], count: number = 4): string[] => {
     if (photos.length <= count) return photos;
     const shuffled = [...photos].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
   }, []);
 
-  // Generar fotos aleatorias cuando cambie el seed o se llegue al paso 3
   const randomPhotos = useMemo(() => {
     return getRandomPhotos(trainingPhotos, 4);
-  }, [trainingPhotos, randomSeed, getRandomPhotos]);
+  }, [trainingPhotos, getRandomPhotos]);
 
-  // Seleccionar automáticamente todas las fotos random cuando se llega al paso 3
-  useEffect(() => {
-    if (step === "photo" && randomPhotos.length > 0) {
-      setSelectedPhotos(randomPhotos);
-    }
-  }, [step, randomPhotos]);
-
-  // Función para refrescar las fotos aleatorias
-  const handleRefreshPhotos = () => {
-    setRandomSeed(prev => prev + 1);
-  };
-  
   const remainingCredits = user
     ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
     : 0;
 
-  const canGenerate = selectedBackground && selectedPose && selectedPhotos.length > 0;
+  // Manejador para subir archivos de objetos
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setObjectFiles(prev => {
+        const newFiles = [...prev, ...files];
+        return newFiles.slice(0, 4); // Límite de 4 imágenes
+      });
+    }
+    e.target.value = "";
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setObjectFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const canProceedToObjects = posePrompt.trim().length > 0;
+  const canGenerate = selectedBackground && posePrompt.trim().length > 0;
 
   const handleGenerate = async () => {
-    if (!canGenerate || !selectedBackground || !selectedPose || selectedPhotos.length === 0) return;
+    if (!canGenerate || !selectedBackground) return;
     
     clearError();
     onGenerateStart();
 
     try {
-      // Obtener los datos de las imágenes
       const background = BACKGROUNDS.find(b => b.id === selectedBackground);
-      const pose = POSES.find(p => p.id === selectedPose);
       
-      if (!background || !pose) {
-        throw new Error("Fondo o pose no encontrados");
+      if (!background) {
+        throw new Error("Fondo no encontrado");
       }
 
       console.log("[v0] Explicit Generation - Starting conversion...");
       console.log("[v0] Background:", background.name, background.image);
-      console.log("[v0] Pose:", pose.name, pose.image);
-      console.log("[v0] Selected photos (model training URLs):", selectedPhotos);
+      console.log("[v0] Pose Prompt:", posePrompt);
 
-      // Convertir imágenes locales a base64 (fondo y pose)
-      const [backgroundB64, poseB64] = await Promise.all([
-        imageUrlToBase64(background.image),
-        imageUrlToBase64(pose.image),
-      ]);
+      // Convertir fondo a base64
+      const backgroundB64 = await imageUrlToBase64(background.image);
 
-      console.log("[v0] Background B64 length:", backgroundB64.length);
-      console.log("[v0] Pose B64 length:", poseB64.length);
+      // Convertir archivos de objetos subidos a base64
+      const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
 
-      // Convertir las fotos de la modelo (URLs remotas) a base64
-      console.log("[v0] Converting model photos to base64...");
+      // Convertir las fotos aleatorias de la modelo a base64 (ocultas en la UI pero necesarias para el modelo)
+      console.log("[v0] Converting hidden model photos to base64...");
       const modelPhotosB64 = await Promise.all(
-        selectedPhotos.map(async (url) => {
+        randomPhotos.map(async (url) => {
           try {
             const response = await fetch(url);
             const blob = await response.blob();
@@ -154,22 +170,28 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
             });
           } catch (err) {
             console.error("[v0] Error converting model photo:", url, err);
-            return url; // Fallback: enviar la URL si falla la conversión
+            return url; // Fallback
           }
         })
       );
-      console.log("[v0] Model photos converted:", modelPhotosB64.map(b => typeof b === 'string' && b.length > 100 ? `base64(${b.length})` : b));
 
-      // Construir prompt combinado usando el fondo y la pose seleccionados
-      const fullPrompt = additionalPrompt.trim()
-        ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
-        : `${background.name} setting, ${pose.name} pose`;
+      // Combinar imágenes de la modelo con las de los objetos subidos
+      const allReferences = [...modelPhotosB64, ...objectsB64];
+
+      // Construir prompt final
+      let fullPrompt = `${background.name} setting. Pose: ${posePrompt.trim()}`;
+      if (objectPrompt.trim()) {
+        fullPrompt += `. Objects/Details: ${objectPrompt.trim()}`;
+      }
+      if (additionalPrompt.trim()) {
+        fullPrompt += `. ${additionalPrompt.trim()}`;
+      }
 
       const requestData = {
         background_b64: backgroundB64,
-        pose_b64: poseB64,
-        reference_url: modelPhotosB64[0] || selectedPhotos[0], // Primera foto de la modelo en base64
-        reference_urls: modelPhotosB64, // Todas las fotos de la modelo en base64
+        pose_b64: "", // Sin imagen de pose
+        reference_url: modelPhotosB64[0] || randomPhotos[0] || "", 
+        reference_urls: allReferences, 
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
@@ -178,14 +200,11 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
       console.log("[v0] Sending to API - request data:", {
         background_b64_length: requestData.background_b64.length,
-        pose_b64_length: requestData.pose_b64.length,
-        reference_url_type: typeof requestData.reference_url === 'string' && requestData.reference_url.length > 100 ? 'base64' : 'url',
         reference_urls_count: requestData.reference_urls.length,
         additional_prompt: requestData.additional_prompt,
         num_images: requestData.num_images,
       });
 
-      // Usar el store para la generación con múltiples fotos de referencia
       await generateExplicit(requestData);
     } catch (err: any) {
       console.error("[v0] Explicit generation error:", err);
@@ -200,7 +219,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
     switch (s) {
       case "background": return 1;
       case "pose": return 2;
-      case "photo": return 3;
+      case "objects": return 3;
       case "confirm": return 4;
     }
   };
@@ -233,7 +252,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
           {/* Progress Steps */}
           <div className="flex items-center justify-between mt-4">
-            {["Fondo", "Pose", "Foto", "Generar"].map((label, idx) => (
+            {["Fondo", "Pose", "Objetos", "Generar"].map((label, idx) => (
               <div key={label} className="flex items-center">
                 <div className={cn(
                   "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all",
@@ -316,7 +335,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
               </motion.div>
             )}
 
-            {/* Step 2: Seleccionar Pose */}
+            {/* Step 2: Describir Pose */}
             {step === "pose" && (
               <motion.div
                 key="pose"
@@ -327,47 +346,28 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
               >
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <User className="h-5 w-5 text-rose-400" />
-                  Selecciona la pose
+                  Describe la pose
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {POSES.map((pose) => (
-                    <button
-                      key={pose.id}
-                      onClick={() => setSelectedPose(pose.id)}
-                      className={cn(
-                        "relative aspect-square rounded-xl overflow-hidden border-2 transition-all",
-                        selectedPose === pose.id
-                          ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
-                          : "border-transparent hover:border-rose-500/50"
-                      )}
-                    >
-                      <img
-                        src={pose.image}
-                        alt={pose.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                      <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
-                        {pose.name}
-                      </span>
-                      {selectedPose === pose.id && (
-                        <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <Textarea
+                    value={posePrompt}
+                    onChange={(e) => setPosePrompt(e.target.value)}
+                    placeholder="Describe la pose deseada para la escena..."
+                    className="min-h-[120px] bg-background/50 border-rose-500/20 focus:border-rose-500/50 resize-none text-base"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {posePrompt.length}/500 caracteres
+                  </p>
                 </div>
+                
                 <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => goToStep("background")}
-                  >
+                  <Button variant="outline" onClick={() => goToStep("background")}>
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                   </Button>
                   <Button
-                    onClick={() => goToStep("photo")}
-                    disabled={!selectedPose}
+                    onClick={() => goToStep("objects")}
+                    disabled={!canProceedToObjects}
                     className="bg-rose-500 hover:bg-rose-600"
                   >
                     Siguiente <ChevronRight className="h-4 w-4 ml-1" />
@@ -376,72 +376,79 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
               </motion.div>
             )}
 
-            {/* Step 3: Fotos de Referencia (4 aleatorias) */}
-            {step === "photo" && (
+            {/* Step 3: Objetos y Descripción */}
+            {step === "objects" && (
               <motion.div
-                key="photo"
+                key="objects"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-4"
+                className="space-y-6"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                     <ImageIcon className="h-5 w-5 text-rose-400" />
-                    Fotos de referencia
+                    Objetos (Opcional)
                   </h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRefreshPhotos}
-                    className="text-xs border-rose-500/30 hover:bg-rose-500/10"
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Cambiar fotos
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Hemos seleccionado 4 fotos al azar de tu entrenamiento
-                </p>
-                {randomPhotos.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No tienes fotos de entrenamiento explícitas disponibles
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {randomPhotos.map((photo, idx) => (
-                      <div
-                        key={`${photo}-${idx}`}
-                        className="relative aspect-square rounded-xl overflow-hidden border-2 border-rose-500/50 ring-2 ring-rose-500/30"
-                      >
-                        <img
-                          src={photo}
-                          alt={`Foto ${idx + 1}`}
-                          className="w-full h-full object-cover"
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Sube hasta 4 imágenes de objetos que quieras incluir en la escena.
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    {objectFiles.map((file, index) => (
+                      <div key={index} className="relative h-20 w-20 overflow-hidden rounded-lg border border-rose-500/30">
+                        <img 
+                          src={URL.createObjectURL(file)} 
+                          alt={`Objeto ${index + 1}`} 
+                          className="h-full w-full object-cover" 
                         />
-                        <div className="absolute top-2 left-2 bg-rose-500 rounded-full px-2 py-0.5">
-                          <span className="text-xs text-white font-medium">{idx + 1}</span>
-                        </div>
-                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                          <div className="flex items-center justify-center">
-                            <Check className="h-4 w-4 text-rose-400 mr-1" />
-                            <span className="text-xs text-white">Seleccionada</span>
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="absolute -right-1 -top-1 rounded-full bg-destructive p-1 text-destructive-foreground z-10"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
                     ))}
+                    
+                    {objectFiles.length < 4 && (
+                      <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-rose-500/30 transition-colors hover:border-rose-500 bg-rose-500/5">
+                        <Upload className="h-5 w-5 text-rose-400 mb-1" />
+                        <span className="text-[10px] text-rose-400">Subir</span>
+                        <input 
+                          type="file" 
+                          accept="image/png,image/jpeg,image/webp" 
+                          multiple 
+                          onChange={handleFileUpload} 
+                          className="hidden" 
+                        />
+                      </label>
+                    )}
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => goToStep("pose")}
-                  >
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    ¿Qué quieres hacer con los objetos?
+                  </label>
+                  <Textarea
+                    value={objectPrompt}
+                    onChange={(e) => setObjectPrompt(e.target.value)}
+                    placeholder="Describe cómo interactúa la modelo con los objetos o dónde deben colocarse..."
+                    className="min-h-[100px] bg-background/50 border-rose-500/20 focus:border-rose-500/50 resize-none text-sm"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {objectPrompt.length}/500 caracteres
+                  </p>
+                </div>
+
+                <div className="flex justify-between pt-2">
+                  <Button variant="outline" onClick={() => goToStep("pose")}>
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                   </Button>
                   <Button
                     onClick={() => goToStep("confirm")}
-                    disabled={randomPhotos.length === 0}
                     className="bg-rose-500 hover:bg-rose-600"
                   >
                     Siguiente <ChevronRight className="h-4 w-4 ml-1" />
@@ -465,62 +472,58 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                 </h3>
                 
                 {/* Fondo y Pose */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Fondo */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground text-center">Fondo</p>
-                    <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30">
+                    <p className="text-xs text-muted-foreground">Fondo</p>
+                    <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30 relative">
                       <img
                         src={BACKGROUNDS.find(b => b.id === selectedBackground)?.image}
                         alt="Fondo seleccionado"
                         className="w-full h-full object-cover"
                       />
+                      <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2">
+                         <p className="text-xs text-white text-center">
+                          {BACKGROUNDS.find(b => b.id === selectedBackground)?.name}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-center text-rose-300">
-                      {BACKGROUNDS.find(b => b.id === selectedBackground)?.name}
-                    </p>
                   </div>
                   
-                  {/* Pose */}
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground text-center">Pose</p>
-                    <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30">
-                      <img
-                        src={POSES.find(p => p.id === selectedPose)?.image}
-                        alt="Pose seleccionada"
-                        className="w-full h-full object-cover"
-                      />
+                    <p className="text-xs text-muted-foreground">Pose solicitada</p>
+                    <div className="h-full rounded-lg border border-rose-500/30 bg-rose-500/5 p-3 flex items-start">
+                      <p className="text-sm text-foreground line-clamp-4">
+                        &quot;{posePrompt}&quot;
+                      </p>
                     </div>
-                    <p className="text-xs text-center text-rose-300">
-                      {POSES.find(p => p.id === selectedPose)?.name}
-                    </p>
                   </div>
                 </div>
 
-                {/* Fotos de referencia (4 aleatorias) */}
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground text-center">Fotos de referencia ({selectedPhotos.length})</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {selectedPhotos.map((photo, idx) => (
-                      <div 
-                        key={`confirm-${idx}`}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-rose-500/30"
-                      >
-                        <img
-                          src={photo}
-                          alt={`Foto ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-1 left-1 bg-rose-500/80 rounded-full w-4 h-4 flex items-center justify-center">
-                          <span className="text-[10px] text-white font-bold">{idx + 1}</span>
-                        </div>
+                {/* Objetos y Prompt Extendido */}
+                {(objectFiles.length > 0 || objectPrompt) && (
+                  <div className="space-y-3 border-t border-rose-500/20 pt-4">
+                    <p className="text-sm font-medium text-foreground">Detalles de objetos</p>
+                    
+                    {objectFiles.length > 0 && (
+                      <div className="flex gap-2">
+                        {objectFiles.map((file, idx) => (
+                          <div key={idx} className="h-12 w-12 rounded border border-rose-500/30 overflow-hidden">
+                            <img src={URL.createObjectURL(file)} className="h-full w-full object-cover" alt="Objeto" />
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                    
+                    {objectPrompt && (
+                      <p className="text-xs text-muted-foreground italic">
+                        {objectPrompt}
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
 
                 {/* Selector de Cantidad de Imágenes */}
-                <div className="space-y-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-4">
+                <div className="space-y-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-4 mt-4">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Images className="h-4 w-4 text-rose-400" />
@@ -575,7 +578,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                 <div className="flex justify-between pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => goToStep("photo")}
+                    onClick={() => goToStep("objects")}
                     disabled={isGenerating}
                   >
                     <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
