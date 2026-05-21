@@ -123,11 +123,18 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
         throw new Error("Fondo no encontrado");
       }
 
+      console.log("[v0] Implicit Generation - Starting conversion...");
+      console.log("[v0] Background:", background.name, background.image);
+      console.log("[v0] Pose prompt:", posePrompt);
+      console.log("[v0] Object files count:", objectFiles.length);
+
       // 1. Convertir fondo predefinido a base64
       const backgroundB64 = await imageUrlToBase64(background.image);
+      console.log("[v0] Background B64 length:", backgroundB64.length);
 
       // 2. Convertir archivos de objetos a base64
       const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
+      console.log("[v0] Objects B64 lengths:", objectsB64.map(o => o.length));
 
       // Construir prompt combinado
       let fullPrompt = `${background.name} setting. Pose: ${posePrompt.trim()}`;
@@ -138,19 +145,27 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
         fullPrompt += `. ${additionalPrompt.trim()}`;
       }
 
-      // NOTA: Ajustar aquí la llamada según lo que espere exactamente generateExplicit para objetos implícitos.
-      // Se asume que reference_urls (u otro campo) puede recibir los base64 o URLs si tu API está preparada para ello.
-      // Actualmente lo envío como reference_urls (si la API de explícito maneja base64 para referencias, genial, sino requiere ajuste en API).
-      await generateExplicit({
+      const requestData = {
         background_b64: backgroundB64,
-        pose_b64: "", // Ya no usamos imagen predefinida
-        reference_url: objectsB64[0] || "", // Envío el primer objeto como ref
-        reference_urls: objectsB64, // Enviar todos los objetos en base64
+        pose_b64: "", // No usamos imagen de pose predefinida en implícito
+        reference_url: objectsB64[0] || "", // Primer objeto como referencia principal
+        reference_urls: objectsB64, // Todos los objetos en base64
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
         num_images: numImages,
+      };
+
+      console.log("[v0] Sending to API - request data:", {
+        background_b64_length: requestData.background_b64.length,
+        pose_b64_length: requestData.pose_b64.length,
+        reference_url_length: requestData.reference_url.length,
+        reference_urls_count: requestData.reference_urls.length,
+        additional_prompt: requestData.additional_prompt,
+        num_images: requestData.num_images,
       });
+
+      await generateExplicit(requestData);
     } catch (err: any) {
       console.error("[v0] Implicit generation error:", err);
     }

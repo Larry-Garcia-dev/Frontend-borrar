@@ -203,6 +203,7 @@ def generate_explicit_image_task(
     background_b64: str,
     pose_b64: str,
     reference_url: str,
+    reference_urls: Optional[list[str]] = None,  # Múltiples URLs o base64 de referencia
     additional_prompt: str = "",
     width: int = 1024,
     height: int = 1024,
@@ -210,17 +211,20 @@ def generate_explicit_image_task(
     user_id: str,
 ) -> dict:
     """
-    Genera una imagen explícita usando 3 imágenes de referencia:
+    Genera una imagen explícita usando imágenes de referencia:
     - background_b64: Base64 del fondo/escenario (ya convertido en frontend)
     - pose_b64: Base64 de la pose a replicar (ya convertido en frontend)
     - reference_url: URL de la foto de la modelo (se resuelve aquí)
+    - reference_urls: Lista de URLs o base64 de múltiples fotos de referencia
     
-    Utiliza un prompt maestro para instruir al modelo sobre cómo combinar las 3 imágenes.
+    Utiliza un prompt maestro para instruir al modelo sobre cómo combinar las imágenes.
     """
     try:
         logger.info(
-            "Starting explicit image generation: user=%s bg_b64_len=%d pose_b64_len=%d ref=%s",
-            user_id, len(background_b64), len(pose_b64), reference_url[:50]
+            "[EXPLICIT TASK] Starting: user=%s bg_b64_len=%d pose_b64_len=%d ref=%s ref_urls_count=%d",
+            user_id, len(background_b64), len(pose_b64), 
+            reference_url[:50] if reference_url else "None",
+            len(reference_urls) if reference_urls else 0
         )
         
         # Construir el prompt final con instrucciones adicionales si las hay
@@ -230,21 +234,48 @@ def generate_explicit_image_task(
         
         final_prompt = EXPLICIT_MASTER_PROMPT.format(additional_instructions=additional_instructions)
         
-        # Fondo y pose ya vienen en base64, solo resolver la URL de referencia
-        reference_b64_list = _resolve_reference_urls([reference_url])
+        # Resolver imágenes de referencia
+        # 1. Si hay reference_urls (múltiples), usar esas
+        # 2. Si no, usar reference_url (singular)
+        all_reference_urls = reference_urls if reference_urls else [reference_url] if reference_url else []
+        logger.info(f"[EXPLICIT TASK] Processing {len(all_reference_urls)} reference URLs/base64")
         
-        if not reference_b64_list:
-            raise ValueError("No se pudo resolver la imagen de referencia de la modelo")
+        # Filtrar URLs vacías
+        all_reference_urls = [url for url in all_reference_urls if url and url.strip()]
         
-        # Combinar las 3 imágenes en base64: background, pose, reference
-        resolved_refs = [background_b64, pose_b64, reference_b64_list[0]]
+        # Resolver las referencias (convertir URLs a base64 si es necesario)
+        reference_b64_list = _resolve_reference_urls(all_reference_urls) if all_reference_urls else []
+        logger.info(f"[EXPLICIT TASK] Resolved {len(reference_b64_list)} reference images to base64")
+        
+        # Combinar las imágenes en base64: background, pose, referencias
+        resolved_refs = []
+        
+        # Agregar fondo si existe
+        if background_b64 and background_b64.strip():
+            resolved_refs.append(background_b64)
+            logger.info(f"[EXPLICIT TASK] Added background (len={len(background_b64)})")
+        
+        # Agregar pose si existe
+        if pose_b64 and pose_b64.strip():
+            resolved_refs.append(pose_b64)
+            logger.info(f"[EXPLICIT TASK] Added pose (len={len(pose_b64)})")
+        
+        # Agregar referencias
+        for i, ref_b64 in enumerate(reference_b64_list):
+            resolved_refs.append(ref_b64)
+            logger.info(f"[EXPLICIT TASK] Added reference {i+1} (len={len(ref_b64)})")
+        
+        logger.info(f"[EXPLICIT TASK] Total images to send to Alibaba: {len(resolved_refs)}")
+        
+        if not resolved_refs:
+            raise ValueError("No se encontraron imágenes de referencia para enviar")
         
         # Usar el modelo de Image2Image más potente
         selected_model = list(IMAGE2IMAGE_MODELS)[0] if IMAGE2IMAGE_MODELS else "wan2.7-image-pro"
         cost = get_cost_usd(selected_model)
         
         logger.info(
-            "Submitting explicit generation: user=%s model=%s images=%d",
+            "[EXPLICIT TASK] Submitting to Alibaba: user=%s model=%s ref_images=%d",
             user_id, selected_model, len(resolved_refs),
         )
         

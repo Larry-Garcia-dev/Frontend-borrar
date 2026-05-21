@@ -89,6 +89,14 @@ export const createGenerationApi = (client: BaseAPIClient) => {
     
     // Generación explícita con 3 imágenes (fondo, pose, referencia)
     async createExplicitGeneration(data: ExplicitGenerationRequest): Promise<GenerationTaskResponse> {
+      console.log("[v0] API createExplicitGeneration - sending data:", {
+        background_b64_length: data.background_b64?.length,
+        pose_b64_length: data.pose_b64?.length,
+        reference_url: data.reference_url?.substring(0, 100),
+        reference_urls_count: data.reference_urls?.length,
+        additional_prompt: data.additional_prompt,
+        num_images: data.num_images,
+      });
       return client.request<GenerationTaskResponse>("/generation/explicit", { method: "POST", body: JSON.stringify(data) });
     },
     

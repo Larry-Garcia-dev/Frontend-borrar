@@ -86,16 +86,62 @@ def _url_to_base64_data_uri(url: str) -> str:
 
 
 def _resolve_reference_urls(urls: Optional[list[str]]) -> Optional[list[str]]:
+    """
+    Resuelve las URLs de referencia a formato base64.
+    - Si es una URL local, la convierte a base64.
+    - Si es una URL remota, la descarga y convierte a base64.
+    - Si ya es base64 (sin prefijo data:), lo deja como está.
+    - Si ya es un data URI, extrae el base64.
+    """
     if not urls:
         return urls
     result = []
     for url in urls:
+        if not url or not url.strip():
+            continue
+            
+        # Si ya es base64 puro (sin prefijo data:), verificar por longitud y caracteres
+        # El base64 típicamente es largo y solo contiene caracteres alfanuméricos, +, /, =
+        if not url.startswith("http") and not url.startswith("data:") and not url.startswith("/"):
+            # Probablemente ya es base64 puro
+            if len(url) > 100 and url.replace("+", "").replace("/", "").replace("=", "").isalnum():
+                logger.info(f"[RESOLVE] URL appears to be raw base64 (len={len(url)})")
+                result.append(url)
+                continue
+        
+        # Si ya es un data URI, extraer el base64
+        if url.startswith("data:"):
+            # Extraer solo la parte base64 después del prefijo
+            if ";base64," in url:
+                base64_part = url.split(";base64,")[1]
+                logger.info(f"[RESOLVE] Extracted base64 from data URI (len={len(base64_part)})")
+                result.append(base64_part)
+            else:
+                result.append(url)
+            continue
+        
         parsed = urlparse(url)
         is_local = parsed.hostname in ("localhost", "127.0.0.1", "::1") or not parsed.scheme
         if is_local:
-            result.append(_url_to_base64_data_uri(url))
+            logger.info(f"[RESOLVE] Converting local URL to base64: {url[:50]}...")
+            converted = _url_to_base64_data_uri(url)
+            # Extraer solo el base64 si es un data URI
+            if converted.startswith("data:") and ";base64," in converted:
+                base64_part = converted.split(";base64,")[1]
+                result.append(base64_part)
+            else:
+                result.append(converted)
         else:
-            result.append(url)
+            # URL remota - descargar y convertir a base64
+            try:
+                logger.info(f"[RESOLVE] Downloading remote URL: {url[:50]}...")
+                image_bytes = _run_async(alibaba_client.download_bytes(url))
+                encoded = base64.b64encode(image_bytes).decode("ascii")
+                logger.info(f"[RESOLVE] Converted remote URL to base64 (len={len(encoded)})")
+                result.append(encoded)
+            except Exception as e:
+                logger.error(f"[RESOLVE] Failed to download remote URL {url[:50]}: {e}")
+                result.append(url)  # Fallback: usar la URL directamente
     return result
 
 
