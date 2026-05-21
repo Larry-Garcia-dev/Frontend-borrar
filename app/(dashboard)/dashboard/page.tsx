@@ -50,7 +50,7 @@ export default function DashboardPage() {
           className="text-muted-foreground hover:text-foreground -ml-3"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Cambiar modelo
+          Cambiar Generacion
         </Button>
       </div>
 
