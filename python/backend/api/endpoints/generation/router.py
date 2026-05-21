@@ -43,6 +43,7 @@ class ExplicitGenerationRequest(BaseModel):
     background_b64: str  # Base64 de la imagen de fondo seleccionada
     pose_b64: str  # Base64 de la imagen de pose seleccionada
     reference_url: str  # URL de la foto de referencia de la modelo (ya está en servidor)
+    reference_urls: list[str] = Field(default_factory=list)  # URLs o base64 de múltiples fotos de referencia
     additional_prompt: str = ""  # Instrucciones adicionales opcionales
     width: int = 1024
     height: int = 1024
@@ -305,10 +306,17 @@ async def create_explicit_generation(
     
     # Encolar la tarea de generación explícita con base64 para fondo y pose
     actual_num_images = max(1, min(10, request.num_images))  # Limitar entre 1 y 10
+    
+    # Log de los datos recibidos
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[EXPLICIT] Received request: bg_b64_len={len(request.background_b64)}, pose_b64_len={len(request.pose_b64)}, ref_url={request.reference_url[:50] if request.reference_url else 'None'}, ref_urls_count={len(request.reference_urls)}, num_images={actual_num_images}")
+    
     task = generate_explicit_image_task.delay(
         background_b64=request.background_b64,
         pose_b64=request.pose_b64,
         reference_url=request.reference_url,
+        reference_urls=request.reference_urls,  # Pasar las URLs múltiples
         additional_prompt=request.additional_prompt,
         width=request.width,
         height=request.height,

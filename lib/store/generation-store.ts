@@ -300,6 +300,15 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   },
 
   generateExplicit: async (data: ExplicitGenerationRequest) => {
+    console.log("[v0] generateExplicit store - received data:", {
+      background_b64_length: data.background_b64?.length,
+      pose_b64_length: data.pose_b64?.length,
+      reference_url: data.reference_url?.substring(0, 100),
+      reference_urls_count: data.reference_urls?.length,
+      additional_prompt: data.additional_prompt,
+      num_images: data.num_images,
+    });
+
     set({
       isGenerating: true,
       error: null,
@@ -311,11 +320,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
 
     try {
       // Crear la tarea de generación explícita (genera 3 imágenes)
+      console.log("[v0] Calling api.createExplicitGeneration...");
       const task = await api.createExplicitGeneration(data);
+      console.log("[v0] Task created:", task);
       set({ taskId: task.task_id, taskStatus: task.status, progress: 10 });
 
       // Usar waitForMultipleGenerations para obtener las 3 imágenes
-      const numImages = 3;
+      const numImages = data.num_images || 3;
       const results = await api.waitForMultipleGenerations(
         task.task_id,
         numImages,
@@ -336,6 +347,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
           ...result,
           storage_url: resolveMediaUrl(result.storage_url),
         }));
+        console.log("[v0] Generation completed, results:", resolvedResults.length);
         set({
           currentGeneration: resolvedResults[0],
           currentGenerations: resolvedResults,
@@ -350,6 +362,7 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       set({ isGenerating: false, progress: 0, taskStatus: "" });
       return null;
     } catch (error) {
+      console.error("[v0] generateExplicit error:", error);
       set({
         error:
           error instanceof Error ? error.message : "Error al generar imagen explícita",

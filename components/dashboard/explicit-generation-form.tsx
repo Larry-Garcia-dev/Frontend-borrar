@@ -121,20 +121,26 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         throw new Error("Fondo o pose no encontrados");
       }
 
+      console.log("[v0] Explicit Generation - Starting conversion...");
+      console.log("[v0] Background:", background.name, background.image);
+      console.log("[v0] Pose:", pose.name, pose.image);
+      console.log("[v0] Selected photos (reference URLs):", selectedPhotos);
+
       // Convertir imágenes locales a base64
       const [backgroundB64, poseB64] = await Promise.all([
         imageUrlToBase64(background.image),
         imageUrlToBase64(pose.image),
       ]);
 
+      console.log("[v0] Background B64 length:", backgroundB64.length);
+      console.log("[v0] Pose B64 length:", poseB64.length);
+
       // Construir prompt combinado
       const fullPrompt = additionalPrompt.trim()
         ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
         : `${background.name} setting, ${pose.name} pose`;
 
-      // Usar el store para la generación con múltiples fotos de referencia
-      // Seleccionamos la primera foto como referencia principal
-      await generateExplicit({
+      const requestData = {
         background_b64: backgroundB64,
         pose_b64: poseB64,
         reference_url: selectedPhotos[0],
@@ -142,8 +148,20 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
-        num_images: numImages, // Cantidad de imágenes a generar
+        num_images: numImages,
+      };
+
+      console.log("[v0] Sending to API - request data:", {
+        background_b64_length: requestData.background_b64.length,
+        pose_b64_length: requestData.pose_b64.length,
+        reference_url: requestData.reference_url,
+        reference_urls: requestData.reference_urls,
+        additional_prompt: requestData.additional_prompt,
+        num_images: requestData.num_images,
       });
+
+      // Usar el store para la generación con múltiples fotos de referencia
+      await generateExplicit(requestData);
     } catch (err: any) {
       console.error("[v0] Explicit generation error:", err);
     }
