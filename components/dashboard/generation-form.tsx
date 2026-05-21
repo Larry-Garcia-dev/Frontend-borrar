@@ -334,21 +334,23 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </div>
           )}
 
-          {/* 1. Prompt Principal (SE MANTIENE EL TEXTAREA) */}
-          <div className="space-y-2 sm:space-y-3">
-            <label className="block text-base sm:text-lg font-semibold text-foreground">
-              Describe tu imagen
-            </label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ej: Un paisaje mágico con montañas flotantes y auroras boreales..."
-              className="h-28 sm:h-36 w-full resize-none rounded-xl border-2 border-input bg-card p-3 sm:p-4 text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
+          {/* 1. Prompt Principal - Solo visible para usuarios que NO son Studio Admin */}
+          {!isStudioAdmin && (
+            <div className="space-y-2 sm:space-y-3">
+              <label className="block text-base sm:text-lg font-semibold text-foreground">
+                Describe tu imagen
+              </label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Ej: Un paisaje mágico con montañas flotantes y auroras boreales..."
+                className="h-28 sm:h-36 w-full resize-none rounded-xl border-2 border-input bg-card p-3 sm:p-4 text-base sm:text-lg text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+          )}
 
-          {/* 2. Selector de Plantillas */}
-          {promptTemplates.length > 0 && (
+          {/* 2. Selector de Plantillas - Solo visible para usuarios que NO son Studio Admin */}
+          {!isStudioAdmin && promptTemplates.length > 0 && (
             <div className="space-y-3">
               <label className="block text-base font-medium text-foreground">
                 Plantilla de estilo (Opcional)
@@ -371,22 +373,24 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
             </div>
           )}
 
-          {/* 3. Selector de Tamaño */}
-          <div className="space-y-3">
-            <label className="block text-base font-medium text-foreground">Tamaño de imagen</label>
-            <select
-              value={selectedSize}
-              onChange={(e) => handleSizeChange(e.target.value)}
-              className="w-full rounded-xl border-2 border-input bg-card px-4 py-3 text-base text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              {SIZE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
+          {/* 3. Selector de Tamaño - Solo visible para usuarios que NO son Studio Admin */}
+          {!isStudioAdmin && (
+            <div className="space-y-3">
+              <label className="block text-base font-medium text-foreground">Tamaño de imagen</label>
+              <select
+                value={selectedSize}
+                onChange={(e) => handleSizeChange(e.target.value)}
+                className="w-full rounded-xl border-2 border-input bg-card px-4 py-3 text-base text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                {SIZE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {/* 4. Selector de Cantidad de Imágenes */}
-          {!isEditing && (
+          {/* 4. Selector de Cantidad de Imágenes - Solo visible para usuarios que NO son Studio Admin */}
+          {!isEditing && !isStudioAdmin && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-base font-medium text-foreground">
@@ -456,7 +460,8 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                 size="xl"
                 className="w-full border-primary/50 text-primary hover:bg-primary/10"
                 onClick={() => setIsImplicitMode(true)}
-                disabled={!prompt.trim() || !selectedModel || isGenerating || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}               >
+                disabled={!selectedModel || isGenerating || (!user?.isUnlimited && remainingCredits <= 0)}
+              >
                 <Sparkles className="mr-2 h-5 w-5" />
                 Generar Implícito
               </Button>
@@ -466,7 +471,7 @@ export function GenerationForm({ onGenerateStart }: GenerationFormProps) {
                 className="w-full bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700"
                 onClick={() => setIsExplicitMode(true)}
                 // Se deshabilita si la modelo no permite contenido explicito
-                disabled={!selectedModel?.is_explicit || isGenerating || (!user?.isUnlimited && !editIsFree && remainingCredits <= 0)}
+                disabled={!selectedModel?.is_explicit || isGenerating || (!user?.isUnlimited && remainingCredits <= 0)}
               >
                 <Flame className="mr-2 h-5 w-5" />
                 Generar Explícito
