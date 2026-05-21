@@ -123,50 +123,31 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
         throw new Error("Fondo no encontrado");
       }
 
-      console.log("[v0] Implicit Generation - Starting conversion...");
+      // Obtener las fotos de entrenamiento de la modelo (URLs)
+      const trainingPhotos = modelProfile.training_photos || [];
+      
+      console.log("[v0] Implicit Generation - Starting...");
       console.log("[v0] Background:", background.name, background.image);
       console.log("[v0] Pose prompt:", posePrompt);
       console.log("[v0] Object files count:", objectFiles.length);
-      console.log("[v0] Model training photos:", modelProfile.training_photos?.length || 0);
+      console.log("[v0] Model training photos (URLs):", trainingPhotos);
 
       // 1. Convertir fondo predefinido a base64
       const backgroundB64 = await imageUrlToBase64(background.image);
       console.log("[v0] Background B64 length:", backgroundB64.length);
 
-      // 2. Convertir archivos de objetos a base64
+      // 2. Convertir archivos de objetos subidos a base64
       const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
       console.log("[v0] Objects B64 lengths:", objectsB64.map(o => o.length));
 
-      // 3. Convertir las fotos de entrenamiento de la modelo a base64
-      const trainingPhotos = modelProfile.training_photos || [];
-      console.log("[v0] Converting model training photos to base64...");
-      const modelPhotosB64 = await Promise.all(
-        trainingPhotos.slice(0, 4).map(async (url) => { // Tomar hasta 4 fotos
-          try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            return new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64 = reader.result as string;
-                const base64Data = base64.split(',')[1];
-                resolve(base64Data);
-              };
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
-          } catch (err) {
-            console.error("[v0] Error converting model photo:", url, err);
-            return ""; // Retornar vacío si falla
-          }
-        })
-      );
-      const validModelPhotos = modelPhotosB64.filter(b => b.length > 0);
-      console.log("[v0] Model photos converted:", validModelPhotos.length);
+      // 3. Usar las URLs de las fotos de entrenamiento directamente
+      // El backend las resolverá a base64
+      const modelPhotoUrls = trainingPhotos.slice(0, 4); // Tomar hasta 4 fotos
+      console.log("[v0] Model photo URLs to send:", modelPhotoUrls);
 
-      // Combinar fotos de la modelo + objetos subidos
-      const allReferencePhotos = [...validModelPhotos, ...objectsB64];
-      console.log("[v0] Total reference photos (model + objects):", allReferencePhotos.length);
+      // Combinar URLs de la modelo + objetos en base64
+      const allReferences = [...modelPhotoUrls, ...objectsB64];
+      console.log("[v0] Total references (URLs + base64):", allReferences.length);
 
       // Construir prompt combinado
       let fullPrompt = `${background.name} setting. Pose: ${posePrompt.trim()}`;
@@ -180,8 +161,8 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       const requestData = {
         background_b64: backgroundB64,
         pose_b64: "", // No usamos imagen de pose predefinida en implícito
-        reference_url: allReferencePhotos[0] || "", // Primera foto como referencia principal
-        reference_urls: allReferencePhotos, // Fotos de la modelo + objetos
+        reference_url: modelPhotoUrls[0] || "", // Primera foto de la modelo (URL)
+        reference_urls: allReferences, // URLs de la modelo + objetos base64
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
@@ -191,8 +172,9 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       console.log("[v0] Sending to API - request data:", {
         background_b64_length: requestData.background_b64.length,
         pose_b64_length: requestData.pose_b64.length,
-        reference_url_type: requestData.reference_url.length > 100 ? 'base64' : 'empty',
+        reference_url: requestData.reference_url,
         reference_urls_count: requestData.reference_urls.length,
+        reference_urls_sample: requestData.reference_urls.slice(0, 2).map(r => r.substring(0, 50)),
         additional_prompt: requestData.additional_prompt,
         num_images: requestData.num_images,
       });
