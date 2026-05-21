@@ -192,22 +192,6 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
     }
   };
 
-      console.log("[v0] Sending to API - request data:", {
-        background_b64_length: requestData.background_b64.length,
-        pose_b64_length: requestData.pose_b64.length,
-        reference_url: requestData.reference_url,
-        reference_urls: requestData.reference_urls,
-        additional_prompt: requestData.additional_prompt,
-        num_images: requestData.num_images,
-      });
-
-      // Usar el store para la generación con múltiples fotos de referencia
-      await generateExplicit(requestData);
-    } catch (err: any) {
-      console.error("[v0] Explicit generation error:", err);
-    }
-  };
-
   const goToStep = (newStep: Step) => {
     setStep(newStep);
   };
