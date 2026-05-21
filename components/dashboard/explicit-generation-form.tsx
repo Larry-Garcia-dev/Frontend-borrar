@@ -124,9 +124,9 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
       console.log("[v0] Explicit Generation - Starting conversion...");
       console.log("[v0] Background:", background.name, background.image);
       console.log("[v0] Pose:", pose.name, pose.image);
-      console.log("[v0] Selected photos (reference URLs):", selectedPhotos);
+      console.log("[v0] Selected photos (model training URLs):", selectedPhotos);
 
-      // Convertir imágenes locales a base64
+      // Convertir imágenes locales a base64 (fondo y pose)
       const [backgroundB64, poseB64] = await Promise.all([
         imageUrlToBase64(background.image),
         imageUrlToBase64(pose.image),
@@ -135,7 +135,32 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
       console.log("[v0] Background B64 length:", backgroundB64.length);
       console.log("[v0] Pose B64 length:", poseB64.length);
 
-      // Construir prompt combinado
+      // Convertir las fotos de la modelo (URLs remotas) a base64
+      console.log("[v0] Converting model photos to base64...");
+      const modelPhotosB64 = await Promise.all(
+        selectedPhotos.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const base64 = reader.result as string;
+                const base64Data = base64.split(',')[1];
+                resolve(base64Data);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          } catch (err) {
+            console.error("[v0] Error converting model photo:", url, err);
+            return url; // Fallback: enviar la URL si falla la conversión
+          }
+        })
+      );
+      console.log("[v0] Model photos converted:", modelPhotosB64.map(b => typeof b === 'string' && b.length > 100 ? `base64(${b.length})` : b));
+
+      // Construir prompt combinado usando el fondo y la pose seleccionados
       const fullPrompt = additionalPrompt.trim()
         ? `${background.name} setting, ${pose.name} pose. ${additionalPrompt}`
         : `${background.name} setting, ${pose.name} pose`;
@@ -143,13 +168,29 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
       const requestData = {
         background_b64: backgroundB64,
         pose_b64: poseB64,
-        reference_url: selectedPhotos[0],
-        reference_urls: selectedPhotos, // Enviamos todas las fotos aleatorias
+        reference_url: modelPhotosB64[0] || selectedPhotos[0], // Primera foto de la modelo en base64
+        reference_urls: modelPhotosB64, // Todas las fotos de la modelo en base64
         additional_prompt: fullPrompt,
         width: 1024,
         height: 1024,
         num_images: numImages,
       };
+
+      console.log("[v0] Sending to API - request data:", {
+        background_b64_length: requestData.background_b64.length,
+        pose_b64_length: requestData.pose_b64.length,
+        reference_url_type: typeof requestData.reference_url === 'string' && requestData.reference_url.length > 100 ? 'base64' : 'url',
+        reference_urls_count: requestData.reference_urls.length,
+        additional_prompt: requestData.additional_prompt,
+        num_images: requestData.num_images,
+      });
+
+      // Usar el store para la generación con múltiples fotos de referencia
+      await generateExplicit(requestData);
+    } catch (err: any) {
+      console.error("[v0] Explicit generation error:", err);
+    }
+  };
 
       console.log("[v0] Sending to API - request data:", {
         background_b64_length: requestData.background_b64.length,
