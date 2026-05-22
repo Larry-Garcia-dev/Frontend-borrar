@@ -45,7 +45,7 @@ extra fingers, missing fingers, fused fingers, too many fingers,
 mutated hands, bad anatomy, bad proportions, disfigured,
 watermark, text, signature, logo, banner,
 oversaturated, overexposed, underexposed,
-duplicate, clone, copy,garments, clothing, lingerie, shoes, stockings, t-shirts, thongs, bras"""
+duplicate, clone, copy,garments, clothing, lingerie, shoes, stockings, t-shirts, thongs, bras, do not add legs"""
 
 
 @celery_app.task(bind=True, name="worker.tasks.generate_image_task", max_retries=3)
