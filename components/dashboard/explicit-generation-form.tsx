@@ -121,10 +121,10 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
 
   // Cargar fondos personalizados al montar (solo para studio_admin)
   useEffect(() => {
-    if (user?.role === "studio_admin") {
+    if (user?.isStudioAdmin) {
       fetchCustomBackgrounds();
     }
-  }, [user?.role, fetchCustomBackgrounds]);
+  }, [user?.isStudioAdmin, fetchCustomBackgrounds]);
 
   // Manejadores para fondos personalizados
   const handleBackgroundFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,7 +396,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                 </div>
 
                 {/* Fondos Personalizados (solo para studio_admin) */}
-                {user?.role === "studio_admin" && (
+                {user?.isStudioAdmin && (
                   <div className="border-t border-rose-500/20 pt-4">
                     <p className="text-sm text-muted-foreground mb-2">Mis fondos personalizados</p>
 
