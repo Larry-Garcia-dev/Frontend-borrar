@@ -7,6 +7,7 @@ import {
   resolveMediaUrl,
   ExplicitGenerationRequest,
   CustomBackground,
+  ImplicitGenerationRequest,
 } from "@/lib/api-client";
 
 interface GenerationState {
@@ -60,8 +61,7 @@ interface GenerationState {
 
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
-  generateWithData: (data: GenerationRequest) => Promise<GeneratedMedia | null>; // <--- AÑADE ESTA LÍNEA
-  fetchGenerations: () => Promise<void>;
+generateWithData: (data: ImplicitGenerationRequest) => Promise<GeneratedMedia | null>;  fetchGenerations: () => Promise<void>;
   fetchPromptTemplates: () => Promise<void>;
   uploadReferenceImages: (files: File[]) => Promise<string[]>;
   fetchCustomBackgrounds: () => Promise<void>;
@@ -308,10 +308,12 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }
   },
 
-  generateWithData: async (data: GenerationRequest) => {
-    console.log("[v0] generateWithData store - received data:", {
+generateWithData: async (data: ImplicitGenerationRequest) => {
+    console.log("[v0] generateWithData store - received structured data:", {
       prompt: data.prompt?.substring(0, 50) + "...",
-      reference_urls_count: data.reference_image_urls?.length || 0,
+      has_background: !!data.background_b64,
+      clothing_count: data.clothing_b64?.length || 0,
+      objects_count: data.objects_b64?.length || 0,
       num_images: data.num_images,
     });
 
@@ -321,17 +323,16 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       progress: 0,
       taskStatus: "queued",
       currentGeneration: null,
-      currentGenerations: [], // Limpiar ambos
+      currentGenerations: [], 
     });
 
     try {
-      // Crear la tarea estándar pero usando los datos pasados por parámetro
-      const task = await api.createGeneration(data);
+      // Nota: Hacemos un "as any" o lo adaptas en tu api-client para que acepte ImplicitGenerationRequest
+      const task = await api.createImplicitGeneration(data);
       set({ taskId: task.task_id, taskStatus: task.status, progress: 10 });
 
       const numImagesToWait = data.num_images || 1;
 
-      // Usar waitForMultipleGenerations
       const results = await api.waitForMultipleGenerations(
         task.task_id,
         numImagesToWait,
@@ -348,7 +349,6 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       );
 
       if (results && results.length > 0) {
-        // Resolver URLs de media para todos los resultados
         const resolvedResults = results.map(result => ({
           ...result,
           storage_url: resolveMediaUrl(result.storage_url),

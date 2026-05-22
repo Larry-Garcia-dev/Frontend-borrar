@@ -1,6 +1,6 @@
 import { BaseAPIClient } from './core';
 import { API_BASE_URL, API_PREFIX } from './config';
-import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport, ExplicitGenerationRequest, CustomBackground } from './types';
+import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport, ExplicitGenerationRequest, CustomBackground,ImplicitGenerationRequest } from './types';
 
 export const createGenerationApi = (client: BaseAPIClient) => {
   const apiMethods = {
@@ -98,6 +98,21 @@ export const createGenerationApi = (client: BaseAPIClient) => {
         num_images: data.num_images,
       });
       return client.request<GenerationTaskResponse>("/generation/explicit", { method: "POST", body: JSON.stringify(data) });
+    },
+
+    // Generación Implícita estructurada
+    async createImplicitGeneration(data: ImplicitGenerationRequest): Promise<GenerationTaskResponse> {
+      console.log("[v0] API createImplicitGeneration - sending data:", {
+        prompt_length: data.prompt?.length,
+        has_background: !!data.background_b64,
+        clothing_count: data.clothing_b64?.length || 0,
+        objects_count: data.objects_b64?.length || 0,
+        num_images: data.num_images,
+      });
+      return client.request<GenerationTaskResponse>("/generation/implicit", { 
+        method: "POST", 
+        body: JSON.stringify(data) 
+      });
     },
     
     async generateExplicitImage(data: ExplicitGenerationRequest): Promise<GeneratedMedia> {

@@ -374,3 +374,182 @@ def generate_explicit_image_task(
         if _should_retry_generation_error(exc):
             raise self.retry(exc=exc, countdown=30)
         raise
+    
+@celery_app.task(bind=True, name="worker.tasks.generate_implicit_image_task", max_retries=3)
+def generate_implicit_image_task(
+    self,
+    *,
+    prompt: str,
+    background_b64: Optional[str] = None,
+    clothing_b64: Optional[list[str]] = None,
+    objects_b64: Optional[list[str]] = None,
+    reference_urls: Optional[list[str]] = None,
+    width: int = 1024,
+    height: int = 1024,
+    num_images: int = 1,
+    style: Optional[str] = None,
+    user_id: str,
+    template_id: Optional[str] = None,
+    parent_media_id: Optional[str] = None,
+) -> dict:
+    """
+    Genera una imagen segura (implícita) separando fondo, ropa, objetos y modelo.
+    Instruye explícitamente a la IA sobre qué representa cada imagen de referencia.
+    """
+    try:
+        with SessionLocal() as db:
+            sys_prompt = get_active_system_prompt(db)
+            tmpl_content = get_template_content(db, template_id) if template_id else None
+
+            resolved_refs = []
+            image_mapping_instructions = []
+
+            # A. Fondo (Prioridad 1 para que la IA entienda el entorno)
+            if background_b64 and background_b64.strip():
+                resolved_refs.append(background_b64)
+                image_mapping_instructions.append(
+                    f"Image {len(resolved_refs)}: CRITICAL - This is the background environment setting. "
+                    "The subject MUST be placed inside this exact environment."
+                )
+
+            # B. Fotos de la Modelo (El sujeto)
+            user = db.get(User, user_id)
+            if user and user.role == UserRole.MODELO:
+                profile = db.query(ModelProfile).filter(ModelProfile.user_id == user.id).first()
+                if profile and profile.training_photos:
+                    num_to_pick = min(3, len(profile.training_photos))
+                    sampled_photos = random.sample(profile.training_photos, num_to_pick)
+                    model_b64_list = _resolve_reference_urls(sampled_photos)
+                    for mb64 in model_b64_list:
+                        resolved_refs.append(mb64)
+                        image_mapping_instructions.append(f"Image {len(resolved_refs)}: The main character/subject.")
+            
+            # Si vienen reference_urls extra desde el front (opcional)
+            if reference_urls:
+                extra_refs = _resolve_reference_urls([u for u in reference_urls if u.strip()])
+                for erb64 in extra_refs:
+                    resolved_refs.append(erb64)
+                    image_mapping_instructions.append(f"Image {len(resolved_refs)}: Additional character reference.")
+
+            # C. Ropa
+            if clothing_b64:
+                for cb64 in clothing_b64:
+                    if cb64.strip():
+                        resolved_refs.append(cb64)
+                        image_mapping_instructions.append(f"Image {len(resolved_refs)}: The specific clothing/outfit to be worn by the subject.")
+
+            # D. Objetos
+            if objects_b64:
+                for ob64 in objects_b64:
+                    if ob64.strip():
+                        resolved_refs.append(ob64)
+                        image_mapping_instructions.append(f"Image {len(resolved_refs)}: Specific objects to include in the scene.")
+
+        # --- CONSTRUCCIÓN DEL PROMPT FINAL ---
+        final_prompt = build_final_prompt(sys_prompt, tmpl_content, prompt)
+        
+        # Inyectar el mapeo de imágenes en el prompt para guiar a la IA
+        if image_mapping_instructions:
+            mapping_text = "\n".join(image_mapping_instructions)
+            final_prompt = f"{final_prompt}\n\n=== REFERENCE IMAGE MAPPING ===\n{mapping_text}\n==============================="
+
+        enriched_prompt = build_image_prompt(final_prompt, style=style)
+        
+        # Usamos un negative prompt seguro por defecto para esta tarea
+        safe_negative = "nude, naked, nsfw, explicit, text, watermark, deformed, bad anatomy, ugly"
+        enriched_negative = build_negative_prompt(safe_negative)
+
+        has_refs = bool(resolved_refs)
+        selected_model = get_image_model(has_refs)
+        cost = get_cost_usd(selected_model)
+
+        logger.info(
+            "[IMPLICIT TASK] Submitting: user=%s model=%s total_refs=%d",
+            user_id, selected_model, len(resolved_refs)
+        )
+        
+        storage_urls: list[str] = []
+        actual_num = max(1, min(10, num_images))
+        
+        # Variaciones para dar resultados distintos
+        variations = [
+            "", " with cinematic lighting", " with soft studio lighting", 
+            " with natural sunlight", " with dramatic shadows", 
+            " with warm color grading", " with cool tone grading"
+        ]
+        
+        for i in range(actual_num):
+            variation_prompt = enriched_prompt
+            if i > 0 and i < len(variations):
+                variation_prompt = f"{enriched_prompt}\nStyle note: {variations[i]}"
+            
+            response = _run_async(
+                alibaba_client.generate_wan_image(
+                    prompt=variation_prompt,
+                    model=selected_model,
+                    negative_prompt=enriched_negative,
+                    width=width,
+                    height=height,
+                    ref_images_b64=resolved_refs,
+                    n=1,
+                )
+            )
+
+            image_urls = _extract_image_urls(response)
+            alibaba_task_id = response.get("output", {}).get("task_id")
+            
+            if not image_urls and alibaba_task_id:
+                result = _poll_alibaba_task(alibaba_task_id)
+                image_urls = _extract_image_urls(result)
+
+            if not image_urls:
+                logger.warning(f"No image URL found for implicit variation {i+1}: {response}")
+                continue
+            
+            image_url = image_urls[0]
+            image_bytes = None
+            
+            # Descarga con reintentos
+            for download_attempt in range(3):
+                try:
+                    image_bytes = _run_async(alibaba_client.download_bytes(image_url))
+                    break
+                except Exception as download_exc:
+                    logger.warning(f"Download attempt {download_attempt + 1}/3 failed: {download_exc}")
+                    if download_attempt < 2:
+                        import time
+                        time.sleep(2)
+                    else:
+                        logger.error(f"Failed to download implicit image {i+1}, skipping...")
+            
+            if not image_bytes:
+                continue
+            
+            ext = _guess_extension(image_url, fallback="png")
+            filename = f"generated/implicit/{user_id}/{uuid.uuid4()}.{ext}"
+            content_type = "image/png" if ext == "png" else "image/jpeg"
+            
+            storage_url = upload_to_oss(image_bytes, filename, content_type=content_type)
+            
+            _persist_media(
+                user_id=user_id,
+                media_type=MediaType.PHOTO,
+                prompt=prompt,
+                storage_url=storage_url,
+                cost_usd=cost,
+                model_used=selected_model,
+                parent_media_id=parent_media_id,
+            )
+            storage_urls.append(storage_url)
+            logger.info(f"Generated implicit image {i+1}/{actual_num} for user {user_id}")
+
+        if storage_urls:
+            return {"storage_urls": storage_urls, "count": len(storage_urls)}
+        else:
+            raise ValueError("No implicit images were generated successfully")
+
+    except Exception as exc:
+        logger.exception("Implicit image generation failed: %s", exc)
+        if _should_retry_generation_error(exc):
+            raise self.retry(exc=exc, countdown=30)
+        raise

@@ -35,6 +35,17 @@ export interface ExplicitGenerationRequest {
   num_images?: number;  // Cantidad de imágenes a generar (1-10)
 }
 
+export interface ImplicitGenerationRequest {
+  prompt: string;
+  background_b64?: string;
+  clothing_b64?: string[];
+  objects_b64?: string[];
+  reference_urls?: string[];
+  width?: number;
+  height?: number;
+  num_images?: number;
+}
+
 export interface GenerationTaskResponse {
   task_id: string;
   status: string;

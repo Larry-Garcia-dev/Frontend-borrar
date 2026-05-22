@@ -14,7 +14,7 @@ from models.user import User, UserRole
 from models.custom_background import CustomBackground
 from services.credit_service import validate_and_consume_credit
 from services.storage import storage_client
-from worker.tasks import generate_image_task, generate_video_task, generate_explicit_image_task
+from worker.tasks import generate_image_task, generate_video_task, generate_explicit_image_task, generate_implicit_image_task
 
 router = APIRouter()
 
@@ -50,7 +50,17 @@ class ExplicitGenerationRequest(BaseModel):
     height: int = 1024
     num_images: int = 3  # Cantidad de imágenes a generar (1-10)
 
-
+class ImplicitGenerationRequest(BaseModel):
+    """Request para generación de contenido implícito estructurado con separación de elementos."""
+    prompt: str
+    background_b64: Optional[str] = None
+    clothing_b64: list[str] = Field(default_factory=list)
+    objects_b64: list[str] = Field(default_factory=list)
+    reference_urls: list[str] = Field(default_factory=list) # Por si envías un array vacío desde React
+    width: int = 1024
+    height: int = 1024
+    num_images: int = 3
+    
 class ReferenceImagesResponse(BaseModel):
     urls: list[str]
 
@@ -335,6 +345,52 @@ async def create_explicit_generation(
     
     return GenerationResponse(task_id=task.id, status="queued", detail="Generación explícita encolada.")
 
+@router.post("/implicit", response_model=GenerationResponse)
+async def create_implicit_generation(
+    request: ImplicitGenerationRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera una imagen segura (implícita) separando estrictamente el fondo, 
+    la ropa y los objetos para darle mejores instrucciones a la IA.
+    """
+    user = db.get(User, current_user["id"])
+    if user is None:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado.")
+    
+    # Consumir crédito
+    try:
+        validate_and_consume_credit(user, db)
+    except ValueError:
+        raise HTTPException(
+            status_code=429,
+            detail="No tienes créditos disponibles.",
+        )
+    
+    actual_num_images = max(1, min(10, request.num_images))
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(
+        f"[IMPLICIT] Received request: bg_b64={'yes' if request.background_b64 else 'no'}, "
+        f"clothing={len(request.clothing_b64)}, objects={len(request.objects_b64)}, num_images={actual_num_images}"
+    )
+    
+    # Encolar la nueva tarea
+    task = generate_implicit_image_task.delay(
+        prompt=request.prompt,
+        background_b64=request.background_b64,
+        clothing_b64=request.clothing_b64,
+        objects_b64=request.objects_b64,
+        reference_urls=request.reference_urls,
+        width=request.width,
+        height=request.height,
+        num_images=actual_num_images,
+        user_id=str(current_user["id"]),
+    )
+    
+    return GenerationResponse(task_id=task.id, status="queued", detail="Generación implícita encolada.")
 
 @router.post("/{media_id}/approve")
 async def approve_media(

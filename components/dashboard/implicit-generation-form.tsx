@@ -225,20 +225,17 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       // 2. Convertir archivos de objetos subidos a base64
       const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
 
-      // 3. Convertir archivos de ropa a base64 (NUEVO)
+      // 3. Convertir archivos de ropa a base64
       const clothingB64 = await Promise.all(clothingFiles.map(file => fileToBase64(file)));
 
-      // 4. Usar las URLs de las fotos de entrenamiento directamente
-      const modelPhotoUrls = trainingPhotos.slice(0, 4); 
+      // Ya NO mezclamos todo en un "allReferences"
+      // El backend de Python será el encargado de tomar estas partes y darle la jerarquía correcta.
 
-      // Combinar URLs de la modelo + objetos en base64 + ropa en base64
-      const allReferences = [...modelPhotoUrls, ...objectsB64, ...clothingB64];
-
-      // Construir prompt combinado incluyendo la ropa
-      let fullPrompt = `${backgroundName} setting. Pose: ${posePrompt.trim()}`;
+      // Construir prompt principal (Seguro y enfocado en la estructura)
+      let fullPrompt = `Generate a high-quality image of the main subject placed in the provided background setting. Pose: ${posePrompt.trim()}`;
       
       if (clothingFiles.length > 0 || clothingPrompt.trim()) {
-        fullPrompt += `. Wearing specific clothing/outfit: ${clothingPrompt.trim() || "as shown in the reference images"}`;
+        fullPrompt += `. Outfit instructions: ${clothingPrompt.trim() || "Wear the exact clothing shown in the provided clothing reference images"}`;
       }
       if (extendedPrompt.trim()) {
         fullPrompt += `. Objects/Details: ${extendedPrompt.trim()}`;
@@ -247,16 +244,25 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
         fullPrompt += `. ${additionalPrompt.trim()}`;
       }
 
+      // NUEVO PAYLOAD: Estructurado y separado
       const requestData = {
-        prompt: fullPrompt, // Cambiado de additional_prompt a prompt
-        reference_image_urls: allReferences, // Cambiado de reference_urls a reference_image_urls
+        prompt: fullPrompt,
+        background_b64: backgroundB64,   // Va por separado
+        clothing_b64: clothingB64,       // Va por separado
+        objects_b64: objectsB64,         // Va por separado
+        reference_urls: [],              // Vacio si dejas que Python ponga las fotos de la modelo
         width: 1024,
         height: 1024,
         num_images: numImages,
-        media_type: "image", // Opcional pero recomendado según tu type.ts
       };
 
-      console.log("[v0] Sending to API - Request prepared.");
+      console.log("[v0] Sending to API - Request prepared.", {
+        promptLength: requestData.prompt.length,
+        hasBackground: !!requestData.background_b64,
+        clothingCount: requestData.clothing_b64.length,
+        objectsCount: requestData.objects_b64.length
+      });
+      
       await generateWithData(requestData);
     } catch (err: any) {
       console.error("[v0] Implicit generation error:", err);
