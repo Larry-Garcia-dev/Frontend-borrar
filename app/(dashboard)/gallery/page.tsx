@@ -11,7 +11,8 @@ import { SessionCard, SessionGroup, groupImagesBySession } from "@/components/ga
 import { SessionDetailModal } from "@/components/gallery/session-detail-modal";
 import { ImageDetailModal } from "@/components/gallery/image-detail-modal";
 import { ReportModal } from "@/components/gallery/report-modal";
-import { Image as ImageIcon, Grid3X3, LayoutGrid } from "lucide-react";
+import { Image as ImageIcon, Grid3X3, LayoutGrid, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +93,12 @@ export default function GalleryPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <Link href="/dashboard">
+          <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </Button>
+        </Link>
         <h1 className="text-4xl font-bold text-foreground">Tu Galería</h1>
         <p className="mt-2 text-lg text-muted-foreground">Todas tus creaciones en un solo lugar</p>
       </motion.div>
