@@ -60,6 +60,7 @@ interface GenerationState {
 
   generate: () => Promise<GeneratedMedia | null>;
   generateExplicit: (data: ExplicitGenerationRequest) => Promise<GeneratedMedia | null>;
+  generateWithData: (data: GenerationRequest) => Promise<GeneratedMedia | null>; // <--- AÑADE ESTA LÍNEA
   fetchGenerations: () => Promise<void>;
   fetchPromptTemplates: () => Promise<void>;
   uploadReferenceImages: (files: File[]) => Promise<string[]>;
@@ -307,6 +308,78 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     }
   },
 
+  generateWithData: async (data: GenerationRequest) => {
+    console.log("[v0] generateWithData store - received data:", {
+      prompt: data.prompt?.substring(0, 50) + "...",
+      reference_urls_count: data.reference_image_urls?.length || 0,
+      num_images: data.num_images,
+    });
+
+    set({
+      isGenerating: true,
+      error: null,
+      progress: 0,
+      taskStatus: "queued",
+      currentGeneration: null,
+      currentGenerations: [], // Limpiar ambos
+    });
+
+    try {
+      // Crear la tarea estándar pero usando los datos pasados por parámetro
+      const task = await api.createGeneration(data);
+      set({ taskId: task.task_id, taskStatus: task.status, progress: 10 });
+
+      const numImagesToWait = data.num_images || 1;
+
+      // Usar waitForMultipleGenerations
+      const results = await api.waitForMultipleGenerations(
+        task.task_id,
+        numImagesToWait,
+        (status) => {
+          set({ taskStatus: status });
+          if (status === "pending" || status === "queued") {
+            set({ progress: 10 });
+          } else if (status === "started") {
+            set({ progress: 30 });
+          } else if (status === "progress") {
+            set((s) => ({ progress: Math.min(s.progress + 10, 90) }));
+          }
+        }
+      );
+
+      if (results && results.length > 0) {
+        // Resolver URLs de media para todos los resultados
+        const resolvedResults = results.map(result => ({
+          ...result,
+          storage_url: resolveMediaUrl(result.storage_url),
+        }));
+        
+        set({
+          currentGeneration: resolvedResults[0],
+          currentGenerations: resolvedResults,
+          generations: [...resolvedResults, ...get().generations],
+          isGenerating: false,
+          progress: 100,
+          taskStatus: "success",
+          parentMediaId: null,
+          parentEditCount: 0,
+        });
+        return resolvedResults[0];
+      }
+
+      set({ isGenerating: false, progress: 0, taskStatus: "" });
+      return null;
+    } catch (error) {
+      console.error("[v0] generateWithData error:", error);
+      set({
+        error: error instanceof Error ? error.message : "Error al generar imagen",
+        isGenerating: false,
+        progress: 0,
+        taskStatus: "failure",
+      });
+      return null;
+    }
+  },
   generateExplicit: async (data: ExplicitGenerationRequest) => {
     console.log("[v0] generateExplicit store - received data:", {
       background_b64_length: data.background_b64?.length,

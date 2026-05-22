@@ -76,7 +76,7 @@ interface ImplicitGenerationFormProps {
 export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: ImplicitGenerationFormProps) {
   const { user } = useAuthStore();
   const {
-    isGenerating, error, clearError, generateExplicit,
+    isGenerating, error, clearError, generateWithData,
     customBackgrounds, isLoadingCustomBackgrounds, fetchCustomBackgrounds,
     uploadCustomBackground, deleteCustomBackground,
   } = useGenerationStore();
@@ -248,18 +248,16 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       }
 
       const requestData = {
-        background_b64: backgroundB64,
-        pose_b64: "", 
-        reference_url: modelPhotoUrls[0] || "", 
-        reference_urls: allReferences, 
-        additional_prompt: fullPrompt,
+        prompt: fullPrompt, // Cambiado de additional_prompt a prompt
+        reference_image_urls: allReferences, // Cambiado de reference_urls a reference_image_urls
         width: 1024,
         height: 1024,
         num_images: numImages,
+        media_type: "image", // Opcional pero recomendado según tu type.ts
       };
 
       console.log("[v0] Sending to API - Request prepared.");
-      await generateExplicit(requestData);
+      await generateWithData(requestData);
     } catch (err: any) {
       console.error("[v0] Implicit generation error:", err);
     }
