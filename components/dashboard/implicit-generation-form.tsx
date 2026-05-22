@@ -124,7 +124,6 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       if (result) {
         setNewBackgroundFile(null);
         setNewBackgroundName("");
-        setShowUploadForm(false);
       }
     } finally {
       setIsUploadingBackground(false);

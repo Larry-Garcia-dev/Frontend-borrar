@@ -144,7 +144,6 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
       if (result) {
         setNewBackgroundFile(null);
         setNewBackgroundName("");
-        setShowUploadForm(false);
       }
     } finally {
       setIsUploadingBackground(false);
