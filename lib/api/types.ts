@@ -303,3 +303,11 @@ export interface SystemPrompt {
   is_active: boolean;
   created_by: string;
 }
+
+export interface CustomBackground {
+  id: string;
+  name: string;
+  storage_url: string;
+  studio_admin_id: string;
+  created_at: string;
+}
