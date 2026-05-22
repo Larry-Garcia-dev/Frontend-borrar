@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,8 @@ from core.security import get_current_user
 from core.database import get_db
 from models.media import Media
 from models.prompt import PromptTemplate
-from models.user import User
+from models.user import User, UserRole
+from models.custom_background import CustomBackground
 from services.credit_service import validate_and_consume_credit
 from services.storage import storage_client
 from worker.tasks import generate_image_task, generate_video_task, generate_explicit_image_task
@@ -57,6 +58,14 @@ class GenerationResponse(BaseModel):
     task_id: str
     status: str
     detail: str = ""
+
+
+class CustomBackgroundResponse(BaseModel):
+    id: str
+    name: str
+    storage_url: str
+    studio_admin_id: str
+    created_at: str
 
 
 def _merge_reference_urls(single: str, many: list[str]) -> list[str]:
@@ -355,4 +364,134 @@ async def approve_media(
     
     db.commit()
     return {"detail": "Media aprobado correctamente"}
+
+
+# ============================================================================
+# Custom Backgrounds Endpoints (solo para studio_admin)
+# ============================================================================
+
+BACKGROUND_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+BACKGROUND_MAX_BYTES = 10 * 1024 * 1024  # 10MB
+
+
+@router.get("/custom-backgrounds", response_model=list[CustomBackgroundResponse])
+async def list_custom_backgrounds(
+    request: Request,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List custom backgrounds for the current studio admin."""
+    user = db.get(User, current_user["id"])
+    if not user or user.role != UserRole.ESTUDIO_ADMIN:
+        raise HTTPException(status_code=403, detail="Solo studio admins pueden ver fondos personalizados.")
+    
+    backgrounds = (
+        db.query(CustomBackground)
+        .filter(CustomBackground.studio_admin_id == user.id)
+        .order_by(CustomBackground.created_at.desc())
+        .all()
+    )
+    
+    base = absolute_base_url(request)
+    
+    return [
+        CustomBackgroundResponse(
+            id=str(bg.id),
+            name=bg.name,
+            storage_url=f"{base}{bg.storage_url}" if bg.storage_url.startswith("/") else bg.storage_url,
+            studio_admin_id=str(bg.studio_admin_id),
+            created_at=bg.created_at.isoformat() if bg.created_at else "",
+        )
+        for bg in backgrounds
+    ]
+
+
+@router.post("/custom-backgrounds", response_model=CustomBackgroundResponse)
+async def upload_custom_background(
+    request: Request,
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a custom background for the current studio admin."""
+    user = db.get(User, current_user["id"])
+    if not user or user.role != UserRole.ESTUDIO_ADMIN:
+        raise HTTPException(status_code=403, detail="Solo studio admins pueden subir fondos personalizados.")
+    
+    # Validate file extension
+    ext = _reference_extension(file.filename or "", file.content_type)
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Formato no permitido. Usa PNG, JPG o WEBP.",
+        )
+    
+    # Read and validate file size
+    data = await file.read()
+    if len(data) > BACKGROUND_MAX_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La imagen debe pesar como máximo {BACKGROUND_MAX_BYTES // (1024 * 1024)} MB.",
+        )
+    
+    # Upload to storage
+    key = storage_client.upload_bytes(data, extension=ext, folder="backgrounds")
+    storage_url = storage_client.get_url(key, expires_in=86400 * 365)  # 1 year expiry
+    
+    # Create database record
+    background = CustomBackground(
+        name=name,
+        storage_url=storage_url,
+        studio_admin_id=user.id,
+    )
+    db.add(background)
+    db.commit()
+    db.refresh(background)
+    
+    base = absolute_base_url(request)
+    
+    return CustomBackgroundResponse(
+        id=str(background.id),
+        name=background.name,
+        storage_url=f"{base}{background.storage_url}" if background.storage_url.startswith("/") else background.storage_url,
+        studio_admin_id=str(background.studio_admin_id),
+        created_at=background.created_at.isoformat() if background.created_at else "",
+    )
+
+
+@router.delete("/custom-backgrounds/{background_id}")
+async def delete_custom_background(
+    background_id: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a custom background."""
+    import uuid as uuid_module
+    
+    user = db.get(User, current_user["id"])
+    if not user or user.role != UserRole.ESTUDIO_ADMIN:
+        raise HTTPException(status_code=403, detail="Solo studio admins pueden eliminar fondos.")
+    
+    try:
+        bg_uuid = uuid_module.UUID(background_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID de fondo inválido.")
+    
+    background = db.get(CustomBackground, bg_uuid)
+    if not background or background.studio_admin_id != user.id:
+        raise HTTPException(status_code=404, detail="Fondo no encontrado.")
+    
+    # Delete from storage if it's a local path
+    if background.storage_url.startswith("/media/"):
+        key = background.storage_url.replace("/media/", "")
+        try:
+            storage_client.delete(key)
+        except Exception:
+            pass  # Ignore storage deletion errors
+    
+    db.delete(background)
+    db.commit()
+    
+    return {"detail": "Fondo eliminado correctamente."}
 
