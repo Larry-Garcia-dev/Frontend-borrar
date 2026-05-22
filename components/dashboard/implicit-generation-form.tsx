@@ -29,18 +29,29 @@ type Step = "background" | "pose" | "objects" | "clothing" | "confirm";
 
 // Función para convertir una imagen URL a base64 (para los fondos predefinidos)
 async function imageUrlToBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      const base64Data = base64.split(',')[1];
-      resolve(base64Data);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  // Para URLs locales, usar fetch directo
+  if (url.startsWith('/')) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        const base64Data = base64.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  
+  // Para URLs externas, usar el proxy para evitar CORS
+  const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+  if (!proxyResponse.ok) {
+    throw new Error("Failed to fetch image via proxy");
+  }
+  const data = await proxyResponse.json();
+  return data.base64;
 }
 
 // Convertir archivo subido a base64
@@ -101,10 +112,10 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
 
   // Cargar fondos personalizados al montar (solo para studio_admin)
   useEffect(() => {
-    if (user?.role === "studio_admin") {
+    if (user?.isStudioAdmin) {
       fetchCustomBackgrounds();
     }
-  }, [user?.role, fetchCustomBackgrounds]);
+  }, [user?.isStudioAdmin, fetchCustomBackgrounds]);
 
   // Manejadores para fondos personalizados
   const handleBackgroundFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,7 +135,6 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       if (result) {
         setNewBackgroundFile(null);
         setNewBackgroundName("");
-        setShowUploadForm(false);
       }
     } finally {
       setIsUploadingBackground(false);
@@ -377,7 +387,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                 </div>
 
                 {/* Fondos Personalizados (solo para studio_admin) */}
-                {user?.role === "studio_admin" && (
+                {user?.isStudioAdmin && (
                   <div className="border-t border-rose-500/20 pt-4">
                     <p className="text-sm text-muted-foreground mb-2">Mis fondos personalizados</p>
 
@@ -440,7 +450,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                           <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
                         </div>
                       ) : (
-                        customBackgrounds.map((bg) => (
+                        (customBackgrounds || []).map((bg) => (
                           <div key={bg.id} className="relative group">
                             <button
                               onClick={() => selectBackground(bg.id, true)}
