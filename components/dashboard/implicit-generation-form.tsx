@@ -29,18 +29,29 @@ type Step = "background" | "pose" | "objects" | "clothing" | "confirm";
 
 // Función para convertir una imagen URL a base64 (para los fondos predefinidos)
 async function imageUrlToBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      const base64Data = base64.split(',')[1];
-      resolve(base64Data);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  // Para URLs locales, usar fetch directo
+  if (url.startsWith('/')) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        const base64Data = base64.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  
+  // Para URLs externas, usar el proxy para evitar CORS
+  const proxyResponse = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+  if (!proxyResponse.ok) {
+    throw new Error("Failed to fetch image via proxy");
+  }
+  const data = await proxyResponse.json();
+  return data.base64;
 }
 
 // Convertir archivo subido a base64
