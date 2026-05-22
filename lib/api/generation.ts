@@ -1,6 +1,6 @@
 import { BaseAPIClient } from './core';
 import { API_BASE_URL, API_PREFIX } from './config';
-import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport, ExplicitGenerationRequest } from './types';
+import { GenerationRequest, GenerationTaskResponse, TaskStatusResponse, GeneratedMedia, PromptTemplate, ImageReport, ExplicitGenerationRequest, CustomBackground } from './types';
 
 export const createGenerationApi = (client: BaseAPIClient) => {
   const apiMethods = {
@@ -105,6 +105,38 @@ export const createGenerationApi = (client: BaseAPIClient) => {
       const result = await apiMethods.waitForGeneration(task.task_id);
       if (!result) throw new Error("No se pudo obtener el resultado de la generación explícita");
       return result;
+    },
+
+    // Custom Backgrounds API (para studio_admin)
+    async getCustomBackgrounds(): Promise<CustomBackground[]> {
+      return client.request<CustomBackground[]>("/generation/custom-backgrounds");
+    },
+
+    async uploadCustomBackground(file: File, name: string): Promise<CustomBackground> {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", name);
+      
+      const headers: HeadersInit = {};
+      const token = client.getToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/generation/custom-backgrounds`, {
+        method: "POST",
+        headers,
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `Error: ${response.status}`);
+      }
+      return response.json();
+    },
+
+    async deleteCustomBackground(backgroundId: string): Promise<{ detail: string }> {
+      return client.request<{ detail: string }>(`/generation/custom-backgrounds/${backgroundId}`, { method: "DELETE" });
     }
   };
   return apiMethods;

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X, Shirt } from "lucide-react";
+import { Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X, Shirt, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { ModelProfile } from "@/lib/api/types";
+import { ModelProfile, CustomBackground } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 // Fondos disponibles
@@ -65,10 +66,20 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
   const { user } = useAuthStore();
   const {
     isGenerating, error, clearError, generateExplicit,
+    customBackgrounds, isLoadingCustomBackgrounds, fetchCustomBackgrounds,
+    uploadCustomBackground, deleteCustomBackground,
   } = useGenerationStore();
 
   const [step, setStep] = useState<Step>("background");
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
+  const [isCustomBackground, setIsCustomBackground] = useState(false);
+  
+  // Estado para subir nuevo fondo personalizado
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [newBackgroundFile, setNewBackgroundFile] = useState<File | null>(null);
+  const [newBackgroundName, setNewBackgroundName] = useState("");
+  const [isUploadingBackground, setIsUploadingBackground] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   
   // Paso 2: Pose
   const [posePrompt, setPosePrompt] = useState<string>("");
@@ -88,6 +99,51 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
   const remainingCredits = user
     ? user.isUnlimited ? Infinity : user.dailyLimit - user.usedQuota
     : 0;
+
+  // Cargar fondos personalizados al montar (solo para studio_admin)
+  useEffect(() => {
+    if (user?.role === "studio_admin") {
+      fetchCustomBackgrounds();
+    }
+  }, [user?.role, fetchCustomBackgrounds]);
+
+  // Manejadores para fondos personalizados
+  const handleBackgroundFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewBackgroundFile(file);
+    }
+    e.target.value = "";
+  };
+
+  const handleUploadBackground = async () => {
+    if (!newBackgroundFile || !newBackgroundName.trim()) return;
+    
+    setIsUploadingBackground(true);
+    try {
+      const result = await uploadCustomBackground(newBackgroundFile, newBackgroundName.trim());
+      if (result) {
+        setNewBackgroundFile(null);
+        setNewBackgroundName("");
+        setShowUploadForm(false);
+      }
+    } finally {
+      setIsUploadingBackground(false);
+    }
+  };
+
+  const handleDeleteBackground = async (bgId: string) => {
+    if (selectedBackground === bgId) {
+      setSelectedBackground(null);
+      setIsCustomBackground(false);
+    }
+    await deleteCustomBackground(bgId);
+  };
+
+  const selectBackground = (id: string, isCustom: boolean) => {
+    setSelectedBackground(id);
+    setIsCustomBackground(isCustom);
+  };
 
   // Manejador para subir objetos
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,18 +188,30 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
     onGenerateStart();
 
     try {
-      const background = BACKGROUNDS.find(b => b.id === selectedBackground);
-      
-      if (!background) {
-        throw new Error("Fondo no encontrado");
+      let backgroundB64: string;
+      let backgroundName: string;
+
+      if (isCustomBackground) {
+        // Fondo personalizado: obtener desde la URL del storage
+        const customBg = customBackgrounds.find(b => b.id === selectedBackground);
+        if (!customBg) {
+          throw new Error("Fondo personalizado no encontrado");
+        }
+        backgroundB64 = await imageUrlToBase64(customBg.storage_url);
+        backgroundName = customBg.name;
+      } else {
+        // Fondo predefinido
+        const background = BACKGROUNDS.find(b => b.id === selectedBackground);
+        if (!background) {
+          throw new Error("Fondo no encontrado");
+        }
+        backgroundB64 = await imageUrlToBase64(background.image);
+        backgroundName = background.name;
       }
 
       const trainingPhotos = modelProfile.training_photos || [];
       
       console.log("[v0] Implicit Generation - Starting...");
-
-      // 1. Convertir fondo predefinido a base64
-      const backgroundB64 = await imageUrlToBase64(background.image);
 
       // 2. Convertir archivos de objetos subidos a base64
       const objectsB64 = await Promise.all(objectFiles.map(file => fileToBase64(file)));
@@ -158,7 +226,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
       const allReferences = [...modelPhotoUrls, ...objectsB64, ...clothingB64];
 
       // Construir prompt combinado incluyendo la ropa
-      let fullPrompt = `${background.name} setting. Pose: ${posePrompt.trim()}`;
+      let fullPrompt = `${backgroundName} setting. Pose: ${posePrompt.trim()}`;
       
       if (clothingFiles.length > 0 || clothingPrompt.trim()) {
         fullPrompt += `. Wearing specific clothing/outfit: ${clothingPrompt.trim() || "as shown in the reference images"}`;
@@ -274,35 +342,186 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                   <ImageIcon className="h-5 w-5 text-rose-400" />
                   Selecciona el fondo
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {BACKGROUNDS.map((bg) => (
-                    <button
-                      key={bg.id}
-                      onClick={() => setSelectedBackground(bg.id)}
-                      className={cn(
-                        "relative aspect-video rounded-xl overflow-hidden border-2 transition-all",
-                        selectedBackground === bg.id
-                          ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
-                          : "border-transparent hover:border-rose-500/50"
-                      )}
-                    >
-                      <img
-                        src={bg.image}
-                        alt={bg.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                      <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
-                        {bg.name}
-                      </span>
-                      {selectedBackground === bg.id && (
-                        <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
+
+                {/* Fondos Predefinidos */}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Fondos predefinidos</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {BACKGROUNDS.map((bg) => (
+                      <button
+                        key={bg.id}
+                        onClick={() => selectBackground(bg.id, false)}
+                        className={cn(
+                          "relative aspect-video rounded-xl overflow-hidden border-2 transition-all",
+                          selectedBackground === bg.id && !isCustomBackground
+                            ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
+                            : "border-transparent hover:border-rose-500/50"
+                        )}
+                      >
+                        <img
+                          src={bg.image}
+                          alt={bg.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
+                          {bg.name}
+                        </span>
+                        {selectedBackground === bg.id && !isCustomBackground && (
+                          <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
+                            <Check className="h-3 w-3 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Fondos Personalizados (solo para studio_admin) */}
+                {user?.role === "studio_admin" && (
+                  <div className="border-t border-rose-500/20 pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Mis fondos personalizados</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowUploadForm(!showUploadForm)}
+                        className="text-rose-400 hover:text-rose-300"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Subir fondo
+                      </Button>
+                    </div>
+
+                    {/* Formulario de subida */}
+                    {showUploadForm && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/5"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex gap-3">
+                            {newBackgroundFile ? (
+                              <div className="relative h-20 w-28 rounded-lg overflow-hidden border border-rose-500/30">
+                                <img
+                                  src={URL.createObjectURL(newBackgroundFile)}
+                                  alt="Preview"
+                                  className="h-full w-full object-cover"
+                                />
+                                <button
+                                  onClick={() => setNewBackgroundFile(null)}
+                                  className="absolute top-1 right-1 bg-destructive rounded-full p-0.5"
+                                >
+                                  <X className="h-3 w-3 text-white" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="flex h-20 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-rose-500/30 hover:border-rose-500 bg-rose-500/5">
+                                <Upload className="h-5 w-5 text-rose-400 mb-1" />
+                                <span className="text-[10px] text-rose-400">Seleccionar</span>
+                                <input
+                                  ref={uploadInputRef}
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={handleBackgroundFileSelect}
+                                  className="hidden"
+                                />
+                              </label>
+                            )}
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                value={newBackgroundName}
+                                onChange={(e) => setNewBackgroundName(e.target.value)}
+                                placeholder="Nombre del fondo"
+                                className="bg-background/50 border-rose-500/20"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={handleUploadBackground}
+                                  disabled={!newBackgroundFile || !newBackgroundName.trim() || isUploadingBackground}
+                                  className="bg-rose-500 hover:bg-rose-600"
+                                >
+                                  {isUploadingBackground ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Guardar"
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setShowUploadForm(false);
+                                    setNewBackgroundFile(null);
+                                    setNewBackgroundName("");
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Grid de fondos personalizados */}
+                    {isLoadingCustomBackgrounds ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
+                      </div>
+                    ) : customBackgrounds.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {customBackgrounds.map((bg) => (
+                          <div key={bg.id} className="relative group">
+                            <button
+                              onClick={() => selectBackground(bg.id, true)}
+                              className={cn(
+                                "relative aspect-video rounded-xl overflow-hidden border-2 transition-all w-full",
+                                selectedBackground === bg.id && isCustomBackground
+                                  ? "border-rose-500 ring-2 ring-rose-500/50 scale-105"
+                                  : "border-transparent hover:border-rose-500/50"
+                              )}
+                            >
+                              <img
+                                src={bg.storage_url}
+                                alt={bg.name}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                              <span className="absolute bottom-1 left-1 right-1 text-xs text-white font-medium text-center">
+                                {bg.name}
+                              </span>
+                              {selectedBackground === bg.id && isCustomBackground && (
+                                <div className="absolute top-1 right-1 bg-rose-500 rounded-full p-1">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
+                            </button>
+                            {/* Botón eliminar */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBackground(bg.id);
+                              }}
+                              className="absolute top-1 left-1 bg-destructive/80 hover:bg-destructive rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="h-3 w-3 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No tienes fondos personalizados. Sube uno para empezar.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-end">
                   <Button
                     onClick={() => goToStep("pose")}
@@ -538,13 +757,19 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                     <p className="text-xs text-muted-foreground">Fondo</p>
                     <div className="aspect-video rounded-lg overflow-hidden border border-rose-500/30 relative">
                       <img
-                        src={BACKGROUNDS.find(b => b.id === selectedBackground)?.image}
+                        src={
+                          isCustomBackground
+                            ? customBackgrounds.find(b => b.id === selectedBackground)?.storage_url
+                            : BACKGROUNDS.find(b => b.id === selectedBackground)?.image
+                        }
                         alt="Fondo seleccionado"
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2">
                          <p className="text-xs text-white text-center">
-                          {BACKGROUNDS.find(b => b.id === selectedBackground)?.name}
+                          {isCustomBackground
+                            ? customBackgrounds.find(b => b.id === selectedBackground)?.name
+                            : BACKGROUNDS.find(b => b.id === selectedBackground)?.name}
                         </p>
                       </div>
                     </div>

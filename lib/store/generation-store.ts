@@ -6,6 +6,7 @@ import {
   PromptTemplate,
   resolveMediaUrl,
   ExplicitGenerationRequest,
+  CustomBackground,
 } from "@/lib/api-client";
 
 interface GenerationState {
@@ -19,6 +20,8 @@ interface GenerationState {
   taskStatus: string;
   taskId: string | null;
   promptTemplates: PromptTemplate[];
+  customBackgrounds: CustomBackground[];
+  isLoadingCustomBackgrounds: boolean;
 
   // Form state
   prompt: string;
@@ -60,6 +63,9 @@ interface GenerationState {
   fetchGenerations: () => Promise<void>;
   fetchPromptTemplates: () => Promise<void>;
   uploadReferenceImages: (files: File[]) => Promise<string[]>;
+  fetchCustomBackgrounds: () => Promise<void>;
+  uploadCustomBackground: (file: File, name: string) => Promise<CustomBackground | null>;
+  deleteCustomBackground: (backgroundId: string) => Promise<void>;
   clearError: () => void;
   resetForm: () => void;
 }
@@ -75,6 +81,8 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
   taskStatus: "",
   taskId: null,
   promptTemplates: [],
+  customBackgrounds: [],
+  isLoadingCustomBackgrounds: false,
 
   // Form defaults
   prompt: "",
@@ -399,6 +407,45 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
       set({ promptTemplates: templates });
     } catch {
       // Silently fail, templates are optional
+    }
+  },
+
+  fetchCustomBackgrounds: async () => {
+    set({ isLoadingCustomBackgrounds: true });
+    try {
+      const backgrounds = await api.getCustomBackgrounds();
+      set({ customBackgrounds: backgrounds, isLoadingCustomBackgrounds: false });
+    } catch {
+      set({ isLoadingCustomBackgrounds: false });
+      // Silently fail if not studio_admin or endpoint not available
+    }
+  },
+
+  uploadCustomBackground: async (file: File, name: string) => {
+    try {
+      const newBackground = await api.uploadCustomBackground(file, name);
+      set((state) => ({
+        customBackgrounds: [newBackground, ...state.customBackgrounds],
+      }));
+      return newBackground;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al subir fondo personalizado",
+      });
+      return null;
+    }
+  },
+
+  deleteCustomBackground: async (backgroundId: string) => {
+    try {
+      await api.deleteCustomBackground(backgroundId);
+      set((state) => ({
+        customBackgrounds: state.customBackgrounds.filter((bg) => bg.id !== backgroundId),
+      }));
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : "Error al eliminar fondo",
+      });
     }
   },
   approveMedia: async (mediaId) => {
