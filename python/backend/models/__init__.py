@@ -8,6 +8,7 @@ from models.report import ImageReport, ReportStatus
 from models.model_profile import ModelProfile, ModelProfileStatus, ModelCreationRequest
 from models.notification import Notification, NotificationType
 from models.billing import BillingRecord, BillingRecordType, UserBalance, ActivityLog
+from models.custom_background import CustomBackground
 
 __all__ = [
     "User",
@@ -29,4 +30,5 @@ __all__ = [
     "BillingRecordType",
     "UserBalance",
     "ActivityLog",
+    "CustomBackground",
 ]

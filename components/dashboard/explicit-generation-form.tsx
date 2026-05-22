@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw,Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X, Plus, Trash2, Loader2 } from "lucide-react";
+import { RefreshCw,Sparkles, Wand2, Image as ImageIcon, User, Check, ChevronLeft, ChevronRight, Images, Upload, X, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,7 +87,6 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   const [isCustomBackground, setIsCustomBackground] = useState(false);
   
   // Estado para subir nuevo fondo personalizado
-  const [showUploadForm, setShowUploadForm] = useState(false);
   const [newBackgroundFile, setNewBackgroundFile] = useState<File | null>(null);
   const [newBackgroundName, setNewBackgroundName] = useState("");
   const [isUploadingBackground, setIsUploadingBackground] = useState(false);
@@ -400,102 +399,68 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                 {/* Fondos Personalizados (solo para studio_admin) */}
                 {user?.role === "studio_admin" && (
                   <div className="border-t border-rose-500/20 pt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">Mis fondos personalizados</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowUploadForm(!showUploadForm)}
-                        className="text-rose-400 hover:text-rose-300"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Subir fondo
-                      </Button>
-                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">Mis fondos personalizados</p>
 
-                    {/* Formulario de subida */}
-                    {showUploadForm && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mb-4 p-3 rounded-lg border border-rose-500/30 bg-rose-500/5"
-                      >
-                        <div className="space-y-3">
-                          <div className="flex gap-3">
-                            {newBackgroundFile ? (
-                              <div className="relative h-20 w-28 rounded-lg overflow-hidden border border-rose-500/30">
-                                <img
-                                  src={URL.createObjectURL(newBackgroundFile)}
-                                  alt="Preview"
-                                  className="h-full w-full object-cover"
-                                />
-                                <button
-                                  onClick={() => setNewBackgroundFile(null)}
-                                  className="absolute top-1 right-1 bg-destructive rounded-full p-0.5"
-                                >
-                                  <X className="h-3 w-3 text-white" />
-                                </button>
-                              </div>
-                            ) : (
-                              <label className="flex h-20 w-28 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-rose-500/30 hover:border-rose-500 bg-rose-500/5">
-                                <Upload className="h-5 w-5 text-rose-400 mb-1" />
-                                <span className="text-[10px] text-rose-400">Seleccionar</span>
-                                <input
-                                  ref={uploadInputRef}
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  onChange={handleBackgroundFileSelect}
-                                  className="hidden"
-                                />
-                              </label>
-                            )}
-                            <div className="flex-1 space-y-2">
+                    {/* Grid de fondos personalizados con opcion de subida integrada */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {/* Tarjeta de subida siempre visible */}
+                      <div className="relative aspect-video">
+                        {newBackgroundFile ? (
+                          <div className="relative h-full w-full rounded-xl overflow-hidden border-2 border-dashed border-rose-500/50 bg-rose-500/10">
+                            <img
+                              src={URL.createObjectURL(newBackgroundFile)}
+                              alt="Preview"
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-2 gap-1">
                               <Input
                                 value={newBackgroundName}
                                 onChange={(e) => setNewBackgroundName(e.target.value)}
-                                placeholder="Nombre del fondo"
-                                className="bg-background/50 border-rose-500/20"
+                                placeholder="Nombre..."
+                                className="h-7 text-xs bg-background/80 border-rose-500/30 text-center"
                               />
-                              <div className="flex gap-2">
+                              <div className="flex gap-1">
                                 <Button
                                   size="sm"
                                   onClick={handleUploadBackground}
-                                  disabled={!newBackgroundFile || !newBackgroundName.trim() || isUploadingBackground}
-                                  className="bg-rose-500 hover:bg-rose-600"
+                                  disabled={!newBackgroundName.trim() || isUploadingBackground}
+                                  className="h-6 px-2 text-xs bg-rose-500 hover:bg-rose-600"
                                 >
-                                  {isUploadingBackground ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    "Guardar"
-                                  )}
+                                  {isUploadingBackground ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => {
-                                    setShowUploadForm(false);
-                                    setNewBackgroundFile(null);
-                                    setNewBackgroundName("");
-                                  }}
+                                  onClick={() => { setNewBackgroundFile(null); setNewBackgroundName(""); }}
+                                  className="h-6 px-2 text-xs"
                                 >
-                                  Cancelar
+                                  <X className="h-3 w-3" />
                                 </Button>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Grid de fondos personalizados */}
-                    {isLoadingCustomBackgrounds ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
+                        ) : (
+                          <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-rose-500/30 hover:border-rose-500 hover:bg-rose-500/5 transition-colors">
+                            <Upload className="h-6 w-6 text-rose-400 mb-1" />
+                            <span className="text-xs text-rose-400 font-medium">Subir fondo</span>
+                            <input
+                              ref={uploadInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              onChange={handleBackgroundFileSelect}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
                       </div>
-                    ) : customBackgrounds.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {customBackgrounds.map((bg) => (
+
+                      {/* Fondos personalizados existentes */}
+                      {isLoadingCustomBackgrounds ? (
+                        <div className="flex items-center justify-center aspect-video">
+                          <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
+                        </div>
+                      ) : (
+                        customBackgrounds.map((bg) => (
                           <div key={bg.id} className="relative group">
                             <button
                               onClick={() => selectBackground(bg.id, true)}
@@ -521,7 +486,7 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                                 </div>
                               )}
                             </button>
-                            {/* Botón eliminar */}
+                            {/* Boton eliminar */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -532,13 +497,9 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
                               <Trash2 className="h-3 w-3 text-white" />
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No tienes fondos personalizados. Sube uno para empezar.
-                      </p>
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
 
