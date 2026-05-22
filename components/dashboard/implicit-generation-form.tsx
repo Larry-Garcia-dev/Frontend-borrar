@@ -439,7 +439,7 @@ export function ImplicitGenerationForm({ onGenerateStart, modelProfile }: Implic
                           <Loader2 className="h-5 w-5 animate-spin text-rose-400" />
                         </div>
                       ) : (
-                        customBackgrounds.map((bg) => (
+                        (customBackgrounds || []).map((bg) => (
                           <div key={bg.id} className="relative group">
                             <button
                               onClick={() => selectBackground(bg.id, true)}

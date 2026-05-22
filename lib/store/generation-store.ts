@@ -414,9 +414,13 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     set({ isLoadingCustomBackgrounds: true });
     try {
       const backgrounds = await api.getCustomBackgrounds();
-      set({ customBackgrounds: backgrounds, isLoadingCustomBackgrounds: false });
+      // Asegurar que siempre sea un array
+      set({ 
+        customBackgrounds: Array.isArray(backgrounds) ? backgrounds : [], 
+        isLoadingCustomBackgrounds: false 
+      });
     } catch {
-      set({ isLoadingCustomBackgrounds: false });
+      set({ customBackgrounds: [], isLoadingCustomBackgrounds: false });
       // Silently fail if not studio_admin or endpoint not available
     }
   },
