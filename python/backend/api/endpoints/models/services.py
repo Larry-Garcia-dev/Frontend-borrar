@@ -346,3 +346,34 @@ def toggle_model_status_service(db: Session, studio_id: str, profile_id: str):
     db.commit()
     db.refresh(profile)
     return format_profile_response(profile)
+def get_studio_info(db: Session, studio_id: str):
+    """Obtiene la información de un estudio basado en su ID."""
+    
+    # 1. Buscar al usuario usando el studio_id
+    try:
+        parsed_uuid = uuid.UUID(studio_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="El formato del ID no es válido")
+
+    studio = db.get(User, parsed_uuid)
+    
+    # 2. Verificar que exista
+    if not studio:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+        
+    # 3. Verificar que el usuario realmente sea un estudio (y no un admin o modelo)
+    if studio.role != UserRole.ESTUDIO_ADMIN:
+        raise HTTPException(status_code=400, detail="El ID proporcionado no pertenece a una cuenta de estudio")
+    
+    # 4. Devolver la información formateada
+    # Ajusta los campos según las columnas exactas que tengas en tu modelo User
+    return {
+        "id": str(studio.id),
+        "email": studio.email,
+        "name": studio.name if hasattr(studio, 'name') else None,
+        "phone": studio.phone if hasattr(studio, 'phone') else None,
+        "daily_limit": studio.daily_limit if hasattr(studio, 'daily_limit') else 0,
+        "is_active": studio.is_active if hasattr(studio, 'is_active') else True,
+        "role": studio.role.value if hasattr(studio.role, "value") else str(studio.role),
+        "created_at": studio.created_at.isoformat() if hasattr(studio, 'created_at') and studio.created_at else None
+    }

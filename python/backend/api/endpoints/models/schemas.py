@@ -1,5 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr
+from datetime import datetime
 
 class ModelInfoRequest(BaseModel):
     """Model basic info for profile."""
@@ -67,3 +68,16 @@ class ModelCreationRequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class StudioInfoResponse(BaseModel):
+    id: str
+    email: EmailStr
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    daily_limit: int
+    is_active: bool
+    role: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True # Permite leer datos de diccionarios y objetos SQLAlchemy

@@ -1,6 +1,7 @@
 import { BaseAPIClient } from './core';
 import { API_PREFIX_ADMIN } from './config';
-import { AdminStats, AdminUser, UserCost, UserMedia, ImageReport, PromptTemplate, SystemPrompt } from './types';
+// NUEVO: Asegúrate de tener StudioInfo exportado en tu archivo types.ts
+import { AdminStats, AdminUser, UserCost, UserMedia, ImageReport, PromptTemplate, SystemPrompt, StudioInfo } from './types';
 
 export const createAdminApi = (client: BaseAPIClient) => ({
   async getAdminStats(): Promise<AdminStats> {
@@ -38,7 +39,18 @@ export const createAdminApi = (client: BaseAPIClient) => ({
   },
   
   // ============================================
-  // NUEVOS: Funcionalidades Prompt Templates Admin
+  // NUEVO: Funcionalidad para obtener info del Estudio
+  // ============================================
+  async getStudios(): Promise<StudioInfo[]> {
+    return client.request<StudioInfo[]>("/studios", {}, API_PREFIX_ADMIN);
+  },
+
+  async getStudioInfo(studioId: string): Promise<StudioInfo> {
+    return client.request<StudioInfo>(`/studios/${studioId}`, {}, API_PREFIX_ADMIN);
+  },
+
+  // ============================================
+  // Funcionalidades Prompt Templates Admin
   // ============================================
   async getAdminPromptTemplates(): Promise<PromptTemplate[]> {
     return client.request<PromptTemplate[]>("/prompt-templates/", {}, API_PREFIX_ADMIN);

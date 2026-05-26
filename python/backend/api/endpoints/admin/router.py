@@ -56,6 +56,22 @@ class StudioCreateRequest(BaseModel):
     daily_limit: int = 100
 
 
+class StudioResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: str
+    name: Optional[str] = None
+    daily_limit: int
+    used_quota: int
+    is_unlimited: bool
+    is_active: bool
+    role: str
+    max_models_limit: int
+    created_at: Optional[datetime] = None
+    models_count: int = 0  # Cantidad de modelos (MODELO users) bajo este estudio
+
+
 def _serialize_user(user: User) -> UserResponse:
     return UserResponse(
         id=user.id,
@@ -68,6 +84,28 @@ def _serialize_user(user: User) -> UserResponse:
         max_models_limit=getattr(user, "max_models_limit", 5),
         vendor_id=user.vendor_id if hasattr(user, "vendor_id") else None,
         studio_id=user.studio_id if hasattr(user, "studio_id") else None,
+    )
+
+
+def _serialize_studio(user: User, db: Session) -> StudioResponse:
+    """Serializar un usuario con rol ESTUDIO_ADMIN como StudioResponse."""
+    # Contar cuántos modelos (usuarios con rol MODELO) tienen este estudio como studio_id
+    models_count = db.execute(
+        select(func.count()).select_from(User).where(User.studio_id == user.id)
+    ).scalar() or 0
+    
+    return StudioResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        daily_limit=user.daily_limit,
+        used_quota=user.used_quota,
+        is_unlimited=bool(user.is_unlimited),
+        is_active=bool(user.is_active),
+        role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        max_models_limit=getattr(user, "max_models_limit", 5),
+        created_at=user.created_at,
+        models_count=int(models_count),
     )
 
 
@@ -117,6 +155,35 @@ async def create_studio(payload: StudioCreateRequest, db: Session = Depends(get_
     db.commit()
     db.refresh(new_studio)
     return _serialize_user(new_studio)
+
+
+@router.get("/studios", response_model=list[StudioResponse])
+async def list_studios(db: Session = Depends(get_db)) -> list[StudioResponse]:
+    """Obtener la lista de todos los estudios (usuarios con rol ESTUDIO_ADMIN)."""
+    studios = db.execute(
+        select(User)
+        .where(User.role == UserRole.ESTUDIO_ADMIN)
+        .order_by(User.created_at.desc())
+    ).scalars().all()
+    
+    return [_serialize_studio(studio, db) for studio in studios]
+
+
+@router.get("/studios/{studio_id}", response_model=StudioResponse)
+async def get_studio(studio_id: UUID, db: Session = Depends(get_db)) -> StudioResponse:
+    """Obtener información detallada de un estudio específico."""
+    studio = db.get(User, studio_id)
+    
+    if studio is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Estudio no encontrado")
+    
+    if studio.role != UserRole.ESTUDIO_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="El usuario no es un estudio"
+        )
+    
+    return _serialize_studio(studio, db)
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

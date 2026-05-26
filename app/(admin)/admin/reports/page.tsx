@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { 
   AlertTriangle, UserPlus, Check, X, DollarSign, 
-  Image as ImageIcon, ZoomIn, ZoomOut, ChevronLeft, ChevronRight 
+  Image as ImageIcon, ZoomIn, ZoomOut, ChevronLeft, ChevronRight , Building
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,12 +23,22 @@ export default function AdminReportsPage() {
     rejectReport,
     approveModelRequest,
     rejectModelRequest,
-    confirmModelPayment
+    confirmModelPayment,
+    studioInfo,
+    isLoadingStudio,
+    fetchStudioInfo,
+    clearStudioInfo
   } = useAdminStore();
 
   const [activeTab, setActiveTab] = useState<"models" | "reports">("models");
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  // --- Estado para expandir/contraer información de modelos ---
+  const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
+
+  // --- Estado para expandir/contraer información de estudios por tarjeta específica ---
+  const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
 
   // --- Estado para el Visualizador de Imágenes ---
   const [lightboxData, setLightboxData] = useState<{ photos: string[], index: number } | null>(null);
@@ -142,7 +152,29 @@ export default function AdminReportsPage() {
       await rejectReport(id, "Reporte rechazado por el administrador.");
     }
   };
-  
+
+  // --- Función para abrir/cerrar info del estudio ---
+  const handleToggleStudioInfo = async (studio_id: string, request_id: string) => {
+    // Si ya está abierto en esta tarjeta específica, lo cerramos
+    if (expandedRequestId === request_id) {
+      setExpandedRequestId(null);
+      clearStudioInfo();
+    } else {
+      // Si no, lo buscamos en el backend y lo mostramos solo en esta tarjeta
+      setExpandedRequestId(request_id);
+      await fetchStudioInfo(studio_id);
+    }
+  };
+
+  // --- Función para toggle de información de modelo ---
+  const handleToggleModelInfo = (modelId: string) => {
+    if (expandedModelId === modelId) {
+      setExpandedModelId(null);
+    } else {
+      setExpandedModelId(modelId);
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Header & Tabs */}
@@ -220,55 +252,132 @@ export default function AdminReportsPage() {
                             <span className="hidden sm:inline text-border">|</span>
                             <span>Tel: {req.model_phone}</span>
                           </div>
-                          <div className="text-sm text-muted-foreground flex flex-wrap gap-x-2 gap-y-1">
-                            <span className="truncate">Estudio ID: {req.studio_id.slice(0,8)}...</span>
+                          <div className="text-sm text-muted-foreground flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
+                            <span className="truncate">Estudio ID: {req.studio_id.slice(0, 8)}...</span>
+                            
+                            {/* Botón para cargar información del estudio */}
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="h-6 text-xs px-2 py-0"
+                              onClick={() => handleToggleStudioInfo(req.studio_id, req.id)}
+                              disabled={isLoadingStudio && expandedRequestId === req.id}
+                            >
+                              {isLoadingStudio && expandedRequestId === req.id
+                                ? "Cargando..." 
+                                : expandedRequestId === req.id ? "Ocultar Estudio" : "Ver Estudio"}
+                            </Button>
+
                             <span className="hidden sm:inline text-border">|</span>
                             <span>Fecha: {formatDate(req.created_at)}</span>
                           </div>
+                          {/* NUEVO: Contenedor de Información del Estudio */}
+                          <AnimatePresence>
+                            {studioInfo && expandedRequestId === req.id && (
+                              <motion.div 
+                                initial={{ opacity: 0, height: 0 }} 
+                                animate={{ opacity: 1, height: "auto" }} 
+                                exit={{ opacity: 0, height: 0 }} 
+                                className="mt-4 bg-blue-500/5 p-4 rounded-xl border border-blue-500/20 overflow-hidden"
+                              >
+                                <h4 className="text-sm font-bold mb-3 text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                                  <Building className="h-4 w-4" /> Información del Estudio
+                                </h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block truncate">Nombre</span>
+                                    <span className="text-sm font-medium">{studioInfo.name || "Sin nombre"}</span>
+                                  </div>
+                                  <div className="col-span-2 sm:col-span-1 md:col-span-2">
+                                    <span className="text-xs text-muted-foreground block truncate">Email</span>
+                                    <span className="text-sm font-medium truncate block" title={studioInfo.email}>{studioInfo.email}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block truncate">Teléfono</span>
+                                    <span className="text-sm font-medium">{studioInfo.phone || "No registrado"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block truncate">Límite Diario</span>
+                                    <span className="text-sm font-medium">{studioInfo.daily_limit} créditos</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground block truncate">Estado</span>
+                                    <span className={cn("text-sm font-medium", studioInfo.is_active ? "text-green-500" : "text-destructive")}>
+                                      {studioInfo.is_active ? "Activo" : "Inactivo"}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-xs text-muted-foreground block truncate">Miembro desde</span>
+                                    <span className="text-sm font-medium">{studioInfo.created_at ? formatDate(studioInfo.created_at) : "N/A"}</span>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                           
                           {req.model_info && (
-                            <div className="mt-4 bg-muted/40 p-4 rounded-xl border border-border/50">
-                              <h4 className="text-sm font-semibold mb-3 text-foreground">Información del Perfil</h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Edad</span>
-                                  <span className="text-sm font-medium">{String(req.model_info.age)} años</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Género</span>
-                                  <span className="text-sm font-medium capitalize truncate">{String(req.model_info.gender)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Etnia</span>
-                                  <span className="text-sm font-medium capitalize truncate">{String(req.model_info.ethnicity)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Estatura</span>
-                                  <span className="text-sm font-medium">{String(req.model_info.height_cm)} cm</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Color Cabello</span>
-                                  <span className="text-sm font-medium capitalize truncate">{String(req.model_info.hair_color)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Color Ojos</span>
-                                  <span className="text-sm font-medium capitalize truncate">{String(req.model_info.eye_color)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Créditos</span>
-                                  <span className="text-sm font-medium">{String(req.model_info.assigned_credits)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground block truncate">Límite Diario</span>
-                                  <span className="text-sm font-medium">{String(req.model_info.assigned_daily_limit)}</span>
-                                </div>
-                                <div className="col-span-2 sm:col-span-3 md:col-span-4 mt-2">
-                                  <span className="text-xs text-muted-foreground block mb-1">Biografía</span>
-                                  <p className="text-sm bg-background p-2 rounded-md border text-muted-foreground italic break-words">
-                                    {req.model_info.bio ? String(req.model_info.bio) : "Sin biografía..."}
-                                  </p>
-                                </div>
-                              </div>
+                            <div className="mt-4 space-y-3">
+                              <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="w-full"
+                                onClick={() => handleToggleModelInfo(req.id)}
+                              >
+                                {expandedModelId === req.id ? "Ocultar Información" : "Ver Información de Perfil"}
+                              </Button>
+                              
+                              <AnimatePresence>
+                                {expandedModelId === req.id && (
+                                  <motion.div 
+                                    initial={{ opacity: 0, height: 0 }} 
+                                    animate={{ opacity: 1, height: "auto" }} 
+                                    exit={{ opacity: 0, height: 0 }} 
+                                    className="bg-muted/40 p-4 rounded-xl border border-border/50 overflow-hidden"
+                                  >
+                                    <h4 className="text-sm font-semibold mb-3 text-foreground">Información del Perfil</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Edad</span>
+                                        <span className="text-sm font-medium">{String(req.model_info.age)} años</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Género</span>
+                                        <span className="text-sm font-medium capitalize truncate">{String(req.model_info.gender)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Etnia</span>
+                                        <span className="text-sm font-medium capitalize truncate">{String(req.model_info.ethnicity)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Estatura</span>
+                                        <span className="text-sm font-medium">{String(req.model_info.height_cm)} cm</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Color Cabello</span>
+                                        <span className="text-sm font-medium capitalize truncate">{String(req.model_info.hair_color)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Color Ojos</span>
+                                        <span className="text-sm font-medium capitalize truncate">{String(req.model_info.eye_color)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Créditos</span>
+                                        <span className="text-sm font-medium">{String(req.model_info.assigned_credits)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-xs text-muted-foreground block truncate">Límite Diario</span>
+                                        <span className="text-sm font-medium">{String(req.model_info.assigned_daily_limit)}</span>
+                                      </div>
+                                      <div className="col-span-2 sm:col-span-3 md:col-span-4 mt-2">
+                                        <span className="text-xs text-muted-foreground block mb-1">Biografía</span>
+                                        <p className="text-sm bg-background p-2 rounded-md border text-muted-foreground italic break-words">
+                                          {req.model_info.bio ? String(req.model_info.bio) : "Sin biografía..."}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                           )}
 

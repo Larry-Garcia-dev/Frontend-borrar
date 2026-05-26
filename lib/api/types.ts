@@ -141,6 +141,23 @@ export interface VendorUser {
   quota_reset_at?: string;
 }
 
+// ==========================================
+// NUEVO: Interfaz para Información del Estudio
+// ==========================================
+export interface StudioInfo {
+  id: string;
+  email: string;
+  name?: string;
+  daily_limit: number;
+  used_quota: number;
+  is_unlimited: boolean;
+  is_active: boolean;
+  role: string;
+  max_models_limit: number;
+  created_at?: string;
+  models_count: number;  // Cantidad de modelos bajo este estudio
+}
+
 // NUEVA ESTRUCTURA: Prompt template para Admin
 export interface PromptTemplate {
   id: string;
@@ -310,4 +327,15 @@ export interface CustomBackground {
   storage_url: string;
   studio_admin_id: string;
   created_at: string;
+}
+
+export interface StudioInfo {
+  id: string;
+  email: string;
+  name?: string;
+  phone?: string;
+  daily_limit: number;
+  is_active: boolean;
+  role: string;
+  created_at?: string;
 }

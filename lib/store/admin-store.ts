@@ -7,6 +7,7 @@ import {
   UserMedia,
   ImageReport,
   ModelCreationRequest,
+  StudioInfo,
 } from "@/lib/api-client";
 
 interface AdminState {
@@ -16,6 +17,13 @@ interface AdminState {
   selectedUserMedia: UserMedia[];
   reports: ImageReport[];
   modelRequests: ModelCreationRequest[];
+  
+  // Estados para los estudios
+  studios: StudioInfo[];
+  studioInfo: StudioInfo | null;
+  isLoadingStudios: boolean;
+  isLoadingStudio: boolean;
+  
   isLoading: boolean;
   error: string | null;
 
@@ -26,6 +34,11 @@ interface AdminState {
   fetchUserMedia: (userId: string) => Promise<void>;
   fetchReports: () => Promise<void>;
   fetchModelRequests: () => Promise<void>;
+
+  // Actions para estudios
+  fetchStudios: () => Promise<void>;
+  fetchStudioInfo: (studioId: string) => Promise<void>;
+  clearStudioInfo: () => void;
 
   createUser: (data: { email: string; role?: string; daily_limit?: number; is_unlimited?: boolean }) => Promise<AdminUser | null>;
   updateUser: (userId: string, data: { daily_limit?: number; role?: string; is_unlimited?: boolean; max_models_limit?: number }) => Promise<AdminUser | null>;
@@ -49,28 +62,35 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   selectedUserMedia: [],
   reports: [],
   modelRequests: [],
+  
+  // Estados iniciales para estudios
+  studios: [],
+  studioInfo: null,
+  isLoadingStudios: false,
+  isLoadingStudio: false,
+  
   isLoading: false,
   error: null,
 
-  fetchStats: async () => { /* ... (mantener igual que antes) ... */
+  fetchStats: async () => {
     set({ isLoading: true, error: null });
     try { const stats = await api.getAdminStats(); set({ stats, isLoading: false }); } 
     catch (e: any) { set({ error: e.message, isLoading: false }); }
   },
 
-  fetchUsers: async () => { /* ... (mantener igual que antes) ... */
+  fetchUsers: async () => {
     set({ isLoading: true, error: null });
     try { const users = await api.getAdminUsers(); set({ users, isLoading: false }); } 
     catch (e: any) { set({ error: e.message, isLoading: false }); }
   },
 
-  fetchUsersCost: async () => { /* ... (mantener igual) ... */
+  fetchUsersCost: async () => {
     set({ isLoading: true, error: null });
     try { const usersCost = await api.getUsersCost(); set({ usersCost, isLoading: false }); } 
     catch (e: any) { set({ error: e.message, isLoading: false }); }
   },
 
-  fetchUserMedia: async (userId: string) => { /* ... (mantener igual) ... */
+  fetchUserMedia: async (userId: string) => {
     set({ isLoading: true, error: null });
     try { const selectedUserMedia = await api.getUserMedia(userId); set({ selectedUserMedia, isLoading: false }); } 
     catch (e: any) { set({ error: e.message, isLoading: false }); }
@@ -88,25 +108,50 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     catch (e: any) { set({ error: e.message, isLoading: false }); }
   },
 
-  createUser: async (data) => { /* ... (mantener igual) ... */
+  // Función para obtener la lista de todos los estudios
+  fetchStudios: async () => {
+    set({ isLoadingStudios: true, error: null });
+    try {
+      const studios = await api.getStudios();
+      set({ studios, isLoadingStudios: false });
+    } catch (e: any) {
+      set({ error: e.message, isLoadingStudios: false, studios: [] });
+    }
+  },
+
+  // Función para obtener la información de un estudio específico
+  fetchStudioInfo: async (studioId: string) => {
+    set({ isLoadingStudio: true, error: null });
+    try {
+      const studioInfo = await api.getStudioInfo(studioId);
+      set({ studioInfo, isLoadingStudio: false });
+    } catch (e: any) {
+      set({ error: e.message, isLoadingStudio: false, studioInfo: null });
+    }
+  },
+
+  // Función para limpiar la información del estudio
+  clearStudioInfo: () => set({ studioInfo: null }),
+
+  createUser: async (data) => {
     set({ isLoading: true, error: null });
     try { const user = await api.createAdminUser(data); set((state) => ({ users: [user, ...state.users], isLoading: false })); return user; } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return null; }
   },
 
-  updateUser: async (userId, data) => { /* ... (mantener igual) ... */
+  updateUser: async (userId, data) => {
     set({ isLoading: true, error: null });
     try { const user = await api.updateAdminUser(userId, data); set((state) => ({ users: state.users.map((u) => (u.id === userId ? user : u)), isLoading: false })); return user; } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return null; }
   },
 
-  deleteUser: async (userId) => { /* ... (mantener igual) ... */
+  deleteUser: async (userId) => {
     set({ isLoading: true, error: null });
     try { await api.deleteAdminUser(userId); set((state) => ({ users: state.users.filter((u) => u.id !== userId), isLoading: false })); return true; } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return false; }
   },
 
-  resetUserQuota: async (userId) => { /* ... (mantener igual) ... */
+  resetUserQuota: async (userId) => {
     set({ isLoading: true, error: null });
     try { const user = await api.resetUserQuota(userId); set((state) => ({ users: state.users.map((u) => (u.id === userId ? user : u)), isLoading: false })); return user; } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return null; }
@@ -128,7 +173,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set({ isLoading: true, error: null });
     try { 
       await api.approveModelRequest(requestId); 
-      await get().fetchModelRequests(); // Recargamos para ver si pasó a PAYMENT_PENDING o se completó
+      await get().fetchModelRequests(); 
       return true; 
     } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return false; }
@@ -148,7 +193,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set({ isLoading: true, error: null });
     try { 
       await api.confirmModelPayment(requestId); 
-      await get().fetchModelRequests(); // Recargamos para ver si volvió a PENDING
+      await get().fetchModelRequests(); 
       return true; 
     } 
     catch (e: any) { set({ error: e.message, isLoading: false }); return false; }

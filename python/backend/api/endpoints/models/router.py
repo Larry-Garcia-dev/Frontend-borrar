@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.security import get_current_user
 
+from .schemas import StudioInfoResponse
+from .services import get_studio_info
+
 # Rutas de subida de archivos (Upload)
 from api.endpoints.models.upload import router as upload_router
 
@@ -131,3 +134,15 @@ async def toggle_model_status(
 ):
     """Pausa o Activa a una modelo."""
     return toggle_model_status_service(db, current_user["id"], profile_id)
+
+@router.get("/studio/{studio_id}", response_model=StudioInfoResponse)
+def get_studio_info_endpoint(
+    studio_id: str, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Validamos que sea un Admin de Macondo
+    if current_user.role != UserRole.MACONDO_ADMIN:
+        raise HTTPException(status_code=403, detail="No tienes permisos")
+    
+    return get_studio_info(db=db, studio_id=studio_id)
