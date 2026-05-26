@@ -142,7 +142,7 @@ export default function AdminReportsPage() {
       await rejectReport(id, "Reporte rechazado por el administrador.");
     }
   };
-
+  
   return (
     <div className="space-y-8">
       {/* Header & Tabs */}
@@ -191,7 +191,6 @@ export default function AdminReportsPage() {
         )}
 
         <AnimatePresence mode="wait">
-          
           {/* TAB: Solicitudes de Modelos */}
           {activeTab === "models" && (
             <motion.div key="models" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-4">
@@ -284,6 +283,25 @@ export default function AdminReportsPage() {
                                     alt="Training preview" 
                                     className="h-16 w-16 object-cover rounded-lg flex-shrink-0 border cursor-pointer hover:ring-2 hover:ring-primary transition-all" 
                                     onClick={() => handleOpenLightbox(req.training_photos, i)}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* NUEVO: Fotos Explícitas */}
+                          {req.explicit_training_photos?.length > 0 && (
+                            <div className="mt-4">
+                              <span className="text-sm font-medium text-destructive mb-2 flex items-center gap-2">
+                                Fotos Explícitas ({req.explicit_training_photos.length})
+                              </span>
+                              <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                {req.explicit_training_photos.map((photo, i) => (
+                                  <img 
+                                    key={`explicit-${i}`} 
+                                    src={photo} 
+                                    alt="Explicit training preview" 
+                                    className="h-16 w-16 object-cover rounded-lg flex-shrink-0 border border-destructive/30 cursor-pointer hover:ring-2 hover:ring-destructive transition-all" 
+                                    onClick={() => handleOpenLightbox(req.explicit_training_photos, i)}
                                   />
                                 ))}
                               </div>
