@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # PROMPT MAESTRO PARA GENERACIÓN EXPLÍCITA
 # ============================================================================
-EXPLICIT_MASTER_PROMPT = """She creates completely nude images in different sexy, provocative poses.
+EXPLICIT_MASTER_PROMPT = """[CRITICAL SYSTEM INSTRUCTION: Image 1 dictates the FACE, IDENTITY, and EXACT SKIN TONE. Image 2 dictates ONLY the body pose. Ignore Image 2's skin color.]
 
 {additional_instructions}
 """

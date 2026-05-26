@@ -7,8 +7,8 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 
 # Text-to-image: no reference images provided.
-# wan2.6-image — photorealistic textures, accurate text rendering, flexible style.
-TEXT_TO_IMAGE_MODEL = "wan2.6-image"
+# wan2.7-image-pro — also used for text-to-image (unified model).
+TEXT_TO_IMAGE_MODEL = "wan2.7-image-pro"
 
 # Image-edit / image-to-image: at least one reference image provided.
 # wan2.7-image-pro — modifies content via natural language, local/style edits,
@@ -42,6 +42,7 @@ IMAGE2IMAGE_ENDPOINT = "/services/aigc/image2image/image-synthesis"
 VIDEO_ENDPOINT = "/services/aigc/video-generation/generation"
 
 # Which models belong to which family (used for routing decisions)
+# Both text-to-image and image-to-image now use wan2.7-image-pro
 TEXT2IMAGE_MODELS: frozenset[str] = frozenset({TEXT_TO_IMAGE_MODEL})
 IMAGE2IMAGE_MODELS: frozenset[str] = frozenset({IMAGE_TO_IMAGE_MODEL})
 VIDEO_MODELS: frozenset[str] = frozenset({TEXT_TO_VIDEO_MODEL, IMAGE_TO_VIDEO_MODEL})
@@ -51,8 +52,8 @@ VIDEO_MODELS: frozenset[str] = frozenset({TEXT_TO_VIDEO_MODEL, IMAGE_TO_VIDEO_MO
 # ---------------------------------------------------------------------------
 
 MODEL_COST_USD: dict[str, float] = {
-    TEXT_TO_IMAGE_MODEL:  0.040,  # wan2.6-image
-    IMAGE_TO_IMAGE_MODEL: 0.060,  # wan2.7-image-pro
+    TEXT_TO_IMAGE_MODEL:  0.060,  # wan2.7-image-pro (text-to-image)
+    IMAGE_TO_IMAGE_MODEL: 0.060,  # wan2.7-image-pro (image-to-image)
     TEXT_TO_VIDEO_MODEL:  0.140,  # wan2.7-t2v
     IMAGE_TO_VIDEO_MODEL: 0.140,  # wan2.7-i2v
     # legacy / fallback

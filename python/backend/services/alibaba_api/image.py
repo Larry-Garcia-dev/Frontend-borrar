@@ -83,7 +83,8 @@ class AlibabaImageMixin:
         size = _map_to_wan_size(width, height)
 
         if model not in IMAGE2IMAGE_MODELS:
-            # ── Text-to-image: wan2.6-image async path ──────────────────────
+            # ── Text-to-image fallback path (currently unused since all image
+            #    generation uses wan2.7-image-pro via IMAGE2IMAGE_MODELS) ─────
             content: list[dict[str, str]] = [{"text": prompt}]
             payload: dict[str, Any] = {
                 "model": model,
@@ -100,7 +101,7 @@ class AlibabaImageMixin:
             async with httpx.AsyncClient(timeout=30, follow_redirects=True, verify=self._verify) as client:
                 resp = await client.post(f"{self.base_url}{endpoint}", headers=async_headers, json=payload)
         else:
-            # ── Image-to-image: wan2.7-image-pro multimodal path ────────────
+            # ── wan2.7-image-pro: unified multimodal path (text-to-image & image-to-image) ──
             content = []
             
             # NUEVO COMPORTAMIENTO: Iteramos la lista de referencias
