@@ -94,7 +94,12 @@ storage_client = StorageClient()
 
 def _local_upload(file_bytes: bytes, filename: str) -> str:
     """Save bytes to local media/generated/ and return the local URL."""
-    ext = Path(filename).suffix.lstrip(".") or "jpg"
+    try:
+        ext = Path(filename).suffix.lstrip(".") or "jpg"
+    except OSError:
+        ext = "jpg"
+    if len(ext) > 10:
+        ext = "jpg"
     key = storage_client.upload_bytes(file_bytes, extension=ext)
     return storage_client.get_url(key)
 

@@ -81,7 +81,10 @@ def _merge_reference_urls(single: str, many: list[str]) -> list[str]:
 
 
 def _reference_extension(filename: str, content_type: Optional[str]) -> str:
-    suffix = Path(filename or "").suffix.lower()
+    try:
+        suffix = Path(filename or "").suffix.lower()
+    except OSError:
+        suffix = ""
     if suffix in REFERENCE_IMAGE_EXTENSIONS:
         return suffix.lstrip(".")
     if content_type == "image/png":
@@ -116,7 +119,7 @@ async def upload_reference_images(
         if not ext:
             raise HTTPException(
                 status_code=400,
-                detail="Formato no permitido. Usa PNG, JPG o WEBP.",
+                detail="Formato no permitido. Usa JPG, JPEG, PNG,  WEBP.",
             )
         data = await upload.read()
         if len(data) > REFERENCE_IMAGE_MAX_BYTES:
@@ -424,7 +427,7 @@ async def upload_custom_background(
     if not ext:
         raise HTTPException(
             status_code=400,
-            detail="Formato no permitido. Usa PNG, JPG o WEBP.",
+            detail="Formato no permitido. Usa JPG, JPEG, PNG o WEBP.",
         )
     
     # Read and validate file size
