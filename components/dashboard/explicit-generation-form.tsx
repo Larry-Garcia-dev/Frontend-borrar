@@ -12,6 +12,7 @@ import { useGenerationStore } from "@/lib/store/generation-store";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { ModelProfile, CustomBackground } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // Fondos disponibles
 const BACKGROUNDS = [
@@ -80,6 +81,47 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// Función para validar una imagen (peso máx 10MB, dimensiones mín 250x250 y máx 8000x8000)
+function validateImage(file: File): Promise<{ valid: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    // Validar peso (máximo 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB en bytes
+    if (file.size > MAX_SIZE) {
+      resolve({
+        valid: false,
+        error: `La imagen "${file.name}" supera el tamaño máximo permitido de 10 MB (actual: ${(file.size / (1024 * 1024)).toFixed(2)} MB).`
+      });
+      return;
+    }
+
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      const { width, height } = img;
+      if (width < 250 || height < 250) {
+        resolve({
+          valid: false,
+          error: `La imagen "${file.name}" debe tener dimensiones de al menos 250x250 píxeles (actual: ${width}x${height}).`
+        });
+      } else if (width > 8000 || height > 8000) {
+        resolve({
+          valid: false,
+          error: `La imagen "${file.name}" no debe exceder las dimensiones de 8000x8000 píxeles (actual: ${width}x${height}).`
+        });
+      } else {
+        resolve({ valid: true });
+      }
+    };
+    img.onerror = () => {
+      resolve({
+        valid: false,
+        error: `No se pudo leer la imagen "${file.name}".`
+      });
+    };
+  });
+}
+
 interface ExplicitGenerationFormProps {
   onGenerateStart: () => void;
   modelProfile: ModelProfile;
@@ -138,9 +180,15 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   }, [user?.isStudioAdmin, fetchCustomBackgrounds]);
 
   // Manejadores para fondos personalizados
-  const handleBackgroundFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackgroundFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const validation = await validateImage(file);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        e.target.value = "";
+        return;
+      }
       setNewBackgroundFile(file);
     }
     e.target.value = "";
@@ -175,9 +223,16 @@ export function ExplicitGenerationForm({ onGenerateStart, modelProfile }: Explic
   };
 
   // Manejador para subir archivos de objetos
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
+      const validations = await Promise.all(files.map(file => validateImage(file)));
+      const invalid = validations.find(v => !v.valid);
+      if (invalid) {
+        toast.error(invalid.error);
+        e.target.value = "";
+        return;
+      }
       setObjectFiles(prev => {
         const newFiles = [...prev, ...files];
         return newFiles.slice(0, 4); // Límite de 4 imágenes
