@@ -1,0 +1,81 @@
+name: Deploy to production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar llave .pem
+        run: |
+          echo "${{ secrets.PEM_KEY }}" | base64 -d > /tmp/deploy.pem
+          chmod 600 /tmp/deploy.pem
+
+      - name: Copiar frontend al server
+        run: |
+          rsync -az --delete \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.git' \
+            --exclude='.env' \
+            -e "ssh -i /tmp/deploy.pem -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/app/frontend/
+
+      - name: Copiar backend al server
+        run: |
+          rsync -az --delete \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='media' \
+            --exclude='.env' \
+            -e "ssh -i /tmp/deploy.pem -o StrictHostKeyChecking=no" \
+            ./python/backend/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/app/backend/
+
+      - name: Desplegar y verificar servicios
+        run: |
+          ssh -i /tmp/deploy.pem \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "
+            set -e
+
+            echo '▶️ 1. Reiniciando Backend y Celery...'
+            bash /app/restart.sh
+            
+            echo '▶️ 2. Reconstruyendo y reiniciando Frontend (Next.js)...'
+            cd /app/frontend
+            npm install
+            npm run build
+            pm2 restart studio-frontend --update-env
+            pm2 save
+            
+            echo '⏳ Esperando 5 segundos a que los servicios se estabilicen...'
+            sleep 5
+            
+            echo '🔍 Verificando salud del Backend...'
+            if ! systemctl is-active --quiet studio-backend.service; then
+              echo '❌ ERROR: studio-backend falló. Últimos logs:'
+              journalctl -u studio-backend.service -n 30 --no-pager
+              exit 1
+            fi
+            
+            echo '🔍 Verificando salud de Celery...'
+            if ! systemctl is-active --quiet macondo-celery.service; then
+              echo '❌ ERROR: macondo-celery falló. Últimos logs:'
+              journalctl -u macondo-celery.service -n 30 --no-pager
+              exit 1
+            fi
+            
+            echo '✅ ¡Despliegue completado con éxito! Todo está corriendo perfectamente.'
+            "
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f /tmp/deploy.pem
