@@ -106,7 +106,16 @@ def _url_to_base64_data_uri(url: str) -> str:
     else:
         relative_key = path.lstrip("/")
 
-    local_path = _BACKEND_DIR / "media" / relative_key
+    if len(relative_key) > 4096:
+        logger.warning("Local media reference path too long: %s", relative_key[:100])
+        return url
+
+    try:
+        local_path = _BACKEND_DIR / "media" / relative_key
+    except OSError as exc:
+        logger.warning("Invalid local media path %s: %s", relative_key[:100], exc)
+        return url
+
     if not local_path.exists():
         logger.warning("Reference image not found locally: %s", local_path)
         return url
@@ -251,9 +260,16 @@ def _extract_video_url(payload: dict) -> str:
 
 
 def _guess_extension(url: str, fallback: str) -> str:
-    suffix = Path(urlparse(url).path).suffix.lower().lstrip(".")
-    if suffix and len(suffix) <= 5:
-        return suffix
+    try:
+        path = urlparse(url).path or ""
+        if len(path) > 4096:
+            logger.warning("URL path too long for extension extraction: %s", url[:100])
+            return fallback
+        suffix = Path(path).suffix.lower().lstrip(".")
+        if suffix and len(suffix) <= 5:
+            return suffix
+    except OSError as exc:
+        logger.warning("Failed to guess extension from url %s: %s", url[:100], exc)
     return fallback
 
 
