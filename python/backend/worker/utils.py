@@ -33,12 +33,71 @@ def _run_async(coro):
         loop.close()
 
 
-def _url_to_base64_data_uri(url: str) -> str:
-    """Convierte una URL local a Data URI Base64 compatible con DashScope."""
+def _normalize_image_bytes(raw: bytes, max_dimension: int = 1920) -> bytes:
+    """Normaliza una imagen a JPEG y la redimensiona para cumplir límites de tamaño/resolución."""
     from PIL import Image
 
     DASHSCOPE_MAX_BYTES = 9 * 1024 * 1024
-    MAX_DIMENSION = 1920
+
+    img = Image.open(io.BytesIO(raw))
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+
+    w, h = img.size
+    if max(w, h) > max_dimension:
+        scale = max_dimension / max(w, h)
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        w, h = img.size
+
+    # Guardar siempre como JPEG para las referencias internas
+    quality = 85
+    while quality >= 20:
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= DASHSCOPE_MAX_BYTES or quality == 20:
+            return data
+        quality -= 15
+
+    # Si aún es demasiado grande, reducir dimensiones otra vez
+    img = img.resize((max(1, w // 2), max(1, h // 2)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=60, optimize=True)
+    return buf.getvalue()
+
+
+def _bytes_to_base64_data_uri(raw: bytes, max_dimension: int = 1920) -> str:
+    """Convierte bytes de imagen a un data URI Base64 seguro para DashScope."""
+    data = _normalize_image_bytes(raw, max_dimension=max_dimension)
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def _normalize_base64_image(base64_string: str) -> str:
+    """Normaliza un string base64 o data URI, asegurando la resolución/bytes permitidos."""
+    if not base64_string or not base64_string.strip():
+        return base64_string
+
+    if base64_string.startswith("data:"):
+        if ";base64," in base64_string:
+            base64_string = base64_string.split(";base64,", 1)[1]
+
+    try:
+        raw = base64.b64decode(base64_string, validate=True)
+    except Exception:
+        return base64_string
+
+    try:
+        normalized_data = _normalize_image_bytes(raw)
+        return base64.b64encode(normalized_data).decode("ascii")
+    except Exception as exc:
+        logger.warning("Failed to normalize base64 image: %s", exc)
+        return base64_string
+
+
+def _url_to_base64_data_uri(url: str) -> str:
+    """Convierte una URL local a Data URI Base64 compatible con DashScope."""
+    from PIL import Image
 
     parsed = urlparse(url)
     path = parsed.path
@@ -53,36 +112,7 @@ def _url_to_base64_data_uri(url: str) -> str:
         return url
 
     raw = local_path.read_bytes()
-
-    if len(raw) <= DASHSCOPE_MAX_BYTES:
-        mime, _ = mimetypes.guess_type(str(local_path))
-        mime = mime or "image/jpeg"
-        encoded = base64.b64encode(raw).decode("ascii")
-        return f"data:{mime};base64,{encoded}"
-
-    img = Image.open(io.BytesIO(raw)).convert("RGB")
-    w, h = img.size
-    if max(w, h) > MAX_DIMENSION:
-        scale = MAX_DIMENSION / max(w, h)
-        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-
-    quality = 85
-    while quality >= 20:
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=quality, optimize=True)
-        data = buf.getvalue()
-        if len(data) <= DASHSCOPE_MAX_BYTES:
-            encoded = base64.b64encode(data).decode("ascii")
-            return f"data:image/jpeg;base64,{encoded}"
-        quality -= 15
-
-    w, h = img.size
-    img = img.resize((w // 2, h // 2), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=60, optimize=True)
-    data = buf.getvalue()
-    encoded = base64.b64encode(data).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
+    return _bytes_to_base64_data_uri(raw)
 
 
 def _resolve_reference_urls(urls: Optional[list[str]]) -> Optional[list[str]]:
@@ -90,8 +120,8 @@ def _resolve_reference_urls(urls: Optional[list[str]]) -> Optional[list[str]]:
     Resuelve las URLs de referencia a formato base64.
     - Si es una URL local, la convierte a base64.
     - Si es una URL remota, la descarga y convierte a base64.
-    - Si ya es base64 (sin prefijo data:), lo deja como está.
-    - Si ya es un data URI, extrae el base64.
+    - Si ya es base64 (sin prefijo data:), la normaliza.
+    - Si ya es un data URI, la normaliza.
     """
     if not urls:
         return urls
@@ -103,23 +133,18 @@ def _resolve_reference_urls(urls: Optional[list[str]]) -> Optional[list[str]]:
         # Si ya es base64 puro (sin prefijo data:), verificar por longitud y caracteres
         # El base64 típicamente es largo y solo contiene caracteres alfanuméricos, +, /, =
         if not url.startswith("http") and not url.startswith("data:") and not url.startswith("/"):
-            # 1. Limpiamos posibles saltos de línea o espacios invisibles del frontend
             clean_url = url.strip().replace("\n", "").replace("\r", "")
-            
-            # 2. Si mide más de 255 caracteres, Linux NUNCA lo aceptará como archivo (evita Errno 36).
-            # O si pasa la validación alfanumérica ya limpia.
             if len(clean_url) > 255 or (len(clean_url) > 100 and clean_url.replace("+", "").replace("/", "").replace("=", "").isalnum()):
                 logger.info(f"[RESOLVE] URL appears to be raw base64 (len={len(clean_url)})")
-                result.append(clean_url)
+                result.append(_normalize_base64_image(clean_url))
                 continue
         
-        # Si ya es un data URI, extraer el base64
+        # Si ya es un data URI, extraer el base64 y normalizarlo
         if url.startswith("data:"):
-            # Extraer solo la parte base64 después del prefijo
             if ";base64," in url:
-                base64_part = url.split(";base64,")[1]
+                base64_part = url.split(";base64,", 1)[1]
                 logger.info(f"[RESOLVE] Extracted base64 from data URI (len={len(base64_part)})")
-                result.append(base64_part)
+                result.append(_normalize_base64_image(base64_part))
             else:
                 result.append(url)
             continue
@@ -129,20 +154,22 @@ def _resolve_reference_urls(urls: Optional[list[str]]) -> Optional[list[str]]:
         if is_local:
             logger.info(f"[RESOLVE] Converting local URL to base64: {url[:50]}...")
             converted = _url_to_base64_data_uri(url)
-            # Extraer solo el base64 si es un data URI
             if converted.startswith("data:") and ";base64," in converted:
-                base64_part = converted.split(";base64,")[1]
+                base64_part = converted.split(";base64,", 1)[1]
                 result.append(base64_part)
             else:
                 result.append(converted)
         else:
-            # URL remota - descargar y convertir a base64
             try:
                 logger.info(f"[RESOLVE] Downloading remote URL: {url[:50]}...")
                 image_bytes = _run_async(alibaba_client.download_bytes(url))
-                encoded = base64.b64encode(image_bytes).decode("ascii")
-                logger.info(f"[RESOLVE] Converted remote URL to base64 (len={len(encoded)})")
-                result.append(encoded)
+                converted = _bytes_to_base64_data_uri(image_bytes)
+                if converted.startswith("data:") and ";base64," in converted:
+                    base64_part = converted.split(";base64,", 1)[1]
+                    result.append(base64_part)
+                else:
+                    result.append(converted)
+                logger.info(f"[RESOLVE] Converted remote URL to base64 (len={len(result[-1])})")
             except Exception as e:
                 logger.error(f"[RESOLVE] Failed to download remote URL {url[:50]}: {e}")
                 result.append(url)  # Fallback: usar la URL directamente
