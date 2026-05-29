@@ -22,6 +22,7 @@ from worker.utils import (
     _resolve_reference_urls,
     _extract_image_urls,
     _poll_alibaba_task,
+    _normalize_base64_image,
     _guess_extension,
     _persist_media,
     _should_retry_generation_error,
@@ -270,13 +271,16 @@ def generate_explicit_image_task(
         if not resolved_refs:
             raise ValueError("No se encontraron imágenes de referencia para enviar")
         
+        # Normalizar todas las imágenes base64 antes de enviarlas a Alibaba.
+        normalized_refs = [_normalize_base64_image(ref) for ref in resolved_refs]
+        
         # Usar el modelo de Image2Image más potente
         selected_model = list(IMAGE2IMAGE_MODELS)[0] if IMAGE2IMAGE_MODELS else "wan2.7-image-pro"
         cost = get_cost_usd(selected_model)
         
         logger.info(
             "[EXPLICIT TASK] Submitting to Alibaba: user=%s model=%s ref_images=%d",
-            user_id, selected_model, len(resolved_refs),
+            user_id, selected_model, len(normalized_refs),
         )
         
         # Generar imágenes con variaciones sutiles para dar opciones al usuario
